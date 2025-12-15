@@ -61,6 +61,8 @@ export type Database = {
       }
       weighing_records: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           created_at: string
           created_offline: boolean | null
           destination: string | null
@@ -78,6 +80,8 @@ export type Database = {
           vehicle_plate: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           created_offline?: boolean | null
           destination?: string | null
@@ -95,6 +99,8 @@ export type Database = {
           vehicle_plate: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           created_offline?: boolean | null
           destination?: string | null
