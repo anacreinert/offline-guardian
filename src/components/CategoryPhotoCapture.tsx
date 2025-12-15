@@ -8,10 +8,11 @@ import { toast } from 'sonner';
 import { OCRConfirmationDialog } from '@/components/OCRConfirmationDialog';
 
 interface OCRResult {
-  type: 'plate' | 'weights';
+  type: 'plate' | 'weights' | 'product';
   plate?: string | null;
   tare?: number | null;
   gross?: number | null;
+  product?: string | null;
   imageUrl: string;
 }
 
@@ -22,6 +23,7 @@ interface CategoryPhotoCaptureProps {
   onPlateRecognized?: (plate: string) => void;
   onWeightRecognized?: (weight: number) => void;
   onBothWeightsRecognized?: (tare: number, gross: number) => void;
+  onProductRecognized?: (product: string) => void;
   label: string;
   disabled?: boolean;
 }
@@ -33,11 +35,12 @@ export function CategoryPhotoCapture({
   onPlateRecognized,
   onWeightRecognized,
   onBothWeightsRecognized,
+  onProductRecognized,
   label,
   disabled = false 
 }: CategoryPhotoCaptureProps) {
   const { isCapturing, error, takePhoto } = useCamera();
-  const { isProcessing, recognizePlate, recognizeBothWeights } = useOCR();
+  const { isProcessing, recognizePlate, recognizeBothWeights, recognizeProduct } = useOCR();
   
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingOCR, setPendingOCR] = useState<OCRResult | null>(null);
@@ -82,6 +85,20 @@ export function CategoryPhotoCapture({
         });
         setShowConfirmDialog(true);
       }
+
+      // If this is a product photo, run OCR for product recognition
+      if (category === 'product' && onProductRecognized) {
+        toast.info('Identificando produto na carga...');
+        const result = await recognizeProduct(captured.dataUrl);
+        
+        // Show confirmation dialog instead of auto-filling
+        setPendingOCR({
+          type: 'product',
+          product: result?.product ?? null,
+          imageUrl: captured.dataUrl,
+        });
+        setShowConfirmDialog(true);
+      }
     } else if (error) {
       toast.error(error);
     }
@@ -103,6 +120,11 @@ export function CategoryPhotoCapture({
         onWeightRecognized(pendingOCR.tare);
         toast.success(`Tara confirmada: ${pendingOCR.tare} kg`);
       }
+    }
+
+    if (pendingOCR.type === 'product' && pendingOCR.product && onProductRecognized) {
+      onProductRecognized(pendingOCR.product);
+      toast.success(`Produto confirmado: ${pendingOCR.product}`);
     }
 
     setPendingOCR(null);
@@ -173,6 +195,7 @@ export function CategoryPhotoCapture({
           plateValue={pendingOCR.plate}
           tareValue={pendingOCR.tare}
           grossValue={pendingOCR.gross}
+          productValue={pendingOCR.product}
           onConfirm={handleConfirmOCR}
           onReject={handleRejectOCR}
         />
