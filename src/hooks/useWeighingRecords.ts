@@ -84,6 +84,10 @@ export function useWeighingRecords() {
         entryTime: r.entry_time ? new Date(r.entry_time) : undefined,
         exitTime: r.exit_time ? new Date(r.exit_time) : undefined,
         status: r.status as WeighingRecord['status'] || undefined,
+        // Weight method
+        weightMethod: (r as any).weight_method as WeighingRecord['weightMethod'] || undefined,
+        isEstimated: (r as any).is_estimated || false,
+        estimatedReason: (r as any).estimated_reason || undefined,
         // Additional
         notes: r.notes || undefined,
         timestamp: new Date(r.created_at),

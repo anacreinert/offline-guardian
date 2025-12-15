@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle, Clock, Truck, Package, MapPin, XCircle, Image } from 'lucide-react';
+import { CheckCircle, Clock, Truck, Package, MapPin, XCircle, Image, Camera, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -45,6 +45,8 @@ interface WeighingRecord {
   created_at: string;
   user_id: string;
   photo_urls?: PhotoUrls | null;
+  weight_method?: string | null;
+  is_estimated?: boolean | null;
 }
 
 interface ApprovalListProps {
@@ -253,6 +255,18 @@ export function ApprovalList({
                       <Badge variant="secondary" className="bg-status-offline/20 text-status-offline text-xs">
                         Offline
                       </Badge>
+                      {record.is_estimated && (
+                        <Badge variant="secondary" className="bg-status-syncing/20 text-status-syncing text-xs flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          Estimado
+                        </Badge>
+                      )}
+                      {record.weight_method === 'display_ocr' && !record.is_estimated && (
+                        <Badge variant="secondary" className="bg-blue-500/20 text-blue-500 text-xs flex items-center gap-1">
+                          <Camera className="w-3 h-3" />
+                          OCR
+                        </Badge>
+                      )}
                     </div>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-muted-foreground">
