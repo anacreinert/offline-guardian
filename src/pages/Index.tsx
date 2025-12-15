@@ -6,6 +6,7 @@ import { WeighingForm } from '@/components/WeighingForm';
 import { RecordsList } from '@/components/RecordsList';
 import { MetricsCards } from '@/components/MetricsCards';
 import { UserMenu } from '@/components/UserMenu';
+import { SyncDebugPanel } from '@/components/SyncDebugPanel';
 import { useConnectionStatus } from '@/hooks/useConnectionStatus';
 import { useWeighingRecords } from '@/hooks/useWeighingRecords';
 import { useSyncManager } from '@/hooks/useSyncManager';
@@ -167,6 +168,16 @@ const Index = () => {
               onFilterChange={setRecordsFilter}
             />
           </div>
+        </div>
+
+        {/* Debug Panel */}
+        <div className="mt-8 animate-fade-in" style={{ animationDelay: '400ms' }}>
+          <SyncDebugPanel
+            syncQueue={syncQueue}
+            records={records}
+            onSyncAll={syncAll}
+            isOnline={!isOffline}
+          />
         </div>
       </main>
     </div>
