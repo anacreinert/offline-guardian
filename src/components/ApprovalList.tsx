@@ -5,6 +5,7 @@ import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -44,15 +45,62 @@ interface ApprovalListProps {
   onReject: (id: string, reason: string) => void;
   onApproveAll: () => void;
   onRejectAll: (reason: string) => void;
+  onApproveSelected?: (ids: string[]) => void;
+  onRejectSelected?: (ids: string[], reason: string) => void;
   isLoading: boolean;
 }
 
-export function ApprovalList({ records, onApprove, onReject, onApproveAll, onRejectAll, isLoading }: ApprovalListProps) {
+export function ApprovalList({ 
+  records, 
+  onApprove, 
+  onReject, 
+  onApproveAll, 
+  onRejectAll, 
+  onApproveSelected,
+  onRejectSelected,
+  isLoading 
+}: ApprovalListProps) {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectAllDialogOpen, setRejectAllDialogOpen] = useState(false);
+  const [rejectSelectedDialogOpen, setRejectSelectedDialogOpen] = useState(false);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+  const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
+
+  const toggleRecordSelection = (recordId: string) => {
+    setSelectedRecordIds(prev => 
+      prev.includes(recordId) 
+        ? prev.filter(id => id !== recordId)
+        : [...prev, recordId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedRecordIds.length === records.length) {
+      setSelectedRecordIds([]);
+    } else {
+      setSelectedRecordIds(records.map(r => r.id));
+    }
+  };
+
+  const handleApproveSelected = async () => {
+    if (onApproveSelected && selectedRecordIds.length > 0) {
+      await onApproveSelected(selectedRecordIds);
+      setSelectedRecordIds([]);
+    }
+  };
+
+  const handleConfirmRejectSelected = async () => {
+    if (onRejectSelected && selectedRecordIds.length > 0) {
+      setIsRejecting(true);
+      await onRejectSelected(selectedRecordIds, rejectionReason);
+      setIsRejecting(false);
+      setRejectSelectedDialogOpen(false);
+      setSelectedRecordIds([]);
+      setRejectionReason('');
+    }
+  };
 
   const handleOpenRejectDialog = (recordId: string) => {
     setSelectedRecordId(recordId);
@@ -101,26 +149,68 @@ export function ApprovalList({ records, onApprove, onReject, onApproveAll, onRej
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Clock className="w-5 h-5" />
-          Pesagens Offline Pendentes
-        </CardTitle>
+      <CardHeader className="flex flex-col space-y-4 pb-4">
+        <div className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            Pesagens Offline Pendentes
+          </CardTitle>
+          {records.length > 0 && (
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => setRejectAllDialogOpen(true)}
+              >
+                <XCircle className="w-4 h-4" />
+                Rejeitar Todos
+              </Button>
+              <Button onClick={onApproveAll} size="sm" className="gap-2">
+                <CheckCircle className="w-4 h-4" />
+                Aprovar Todos ({records.length})
+              </Button>
+            </div>
+          )}
+        </div>
+        
+        {/* Selection controls */}
         {records.length > 0 && (
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-              onClick={() => setRejectAllDialogOpen(true)}
-            >
-              <XCircle className="w-4 h-4" />
-              Rejeitar Todos
-            </Button>
-            <Button onClick={onApproveAll} size="sm" className="gap-2">
-              <CheckCircle className="w-4 h-4" />
-              Aprovar Todos ({records.length})
-            </Button>
+          <div className="flex items-center justify-between border-t pt-4">
+            <div className="flex items-center gap-3">
+              <Checkbox 
+                id="select-all"
+                checked={selectedRecordIds.length === records.length && records.length > 0}
+                onCheckedChange={toggleSelectAll}
+              />
+              <Label htmlFor="select-all" className="text-sm text-muted-foreground cursor-pointer">
+                {selectedRecordIds.length === records.length 
+                  ? 'Desmarcar todos' 
+                  : `Selecionar todos (${records.length})`}
+              </Label>
+              {selectedRecordIds.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {selectedRecordIds.length} selecionado(s)
+                </Badge>
+              )}
+            </div>
+            {selectedRecordIds.length > 0 && (
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => setRejectSelectedDialogOpen(true)}
+                >
+                  <XCircle className="w-4 h-4" />
+                  Rejeitar ({selectedRecordIds.length})
+                </Button>
+                <Button onClick={handleApproveSelected} size="sm" className="gap-2">
+                  <CheckCircle className="w-4 h-4" />
+                  Aprovar ({selectedRecordIds.length})
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardHeader>
@@ -136,9 +226,18 @@ export function ApprovalList({ records, onApprove, onReject, onApproveAll, onRej
             {records.map(record => (
               <div
                 key={record.id}
-                className="p-4 rounded-lg border border-status-syncing/30 bg-status-syncing/5 hover:bg-status-syncing/10 transition-colors"
+                className={`p-4 rounded-lg border transition-colors ${
+                  selectedRecordIds.includes(record.id) 
+                    ? 'border-primary bg-primary/5' 
+                    : 'border-status-syncing/30 bg-status-syncing/5 hover:bg-status-syncing/10'
+                }`}
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <Checkbox 
+                    checked={selectedRecordIds.includes(record.id)}
+                    onCheckedChange={() => toggleRecordSelection(record.id)}
+                    className="mt-1"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
                       <Truck className="w-4 h-4 text-muted-foreground" />
@@ -285,6 +384,43 @@ export function ApprovalList({ records, onApprove, onReject, onApproveAll, onRej
               disabled={isRejecting}
             >
               {isRejecting ? 'Rejeitando...' : `Rejeitar Todos (${records.length})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Selected Dialog */}
+      <Dialog open={rejectSelectedDialogOpen} onOpenChange={setRejectSelectedDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rejeitar Pesagens Selecionadas</DialogTitle>
+            <DialogDescription>
+              Você está prestes a rejeitar {selectedRecordIds.length} pesagem(ns) selecionada(s). 
+              Informe o motivo da rejeição.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rejection-selected-reason">Motivo da Rejeição</Label>
+              <Textarea
+                id="rejection-selected-reason"
+                placeholder="Descreva o motivo da rejeição..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectSelectedDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleConfirmRejectSelected}
+              disabled={isRejecting}
+            >
+              {isRejecting ? 'Rejeitando...' : `Rejeitar (${selectedRecordIds.length})`}
             </Button>
           </DialogFooter>
         </DialogContent>
