@@ -57,9 +57,11 @@ const Index = () => {
     }
   }, [isAuthenticated, loading, navigate]);
 
-  // Auto-sync when coming back online
+  // Auto-sync only non-offline records when coming back online
+  // Offline records require manager approval before sync
   useEffect(() => {
-    if (!isOffline && syncQueue.pendingCount > 0 && !syncQueue.isProcessing) {
+    const pendingNonOffline = getPendingRecords().filter(r => !r.createdOffline);
+    if (!isOffline && pendingNonOffline.length > 0 && !syncQueue.isProcessing) {
       // Small delay to ensure stable connection
       const timer = setTimeout(async () => {
         await syncAll();
@@ -68,13 +70,14 @@ const Index = () => {
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [isOffline, syncQueue.pendingCount, syncQueue.isProcessing, syncAll, refreshRecords]);
+  }, [isOffline, syncQueue.isProcessing, syncAll, refreshRecords, getPendingRecords]);
 
   const handleSubmit = async (data: Parameters<typeof addRecord>[0]) => {
     const newRecord = addRecord(data, isOffline);
     
-    // If online, immediately sync the new record
-    if (!isOffline) {
+    // If online and NOT created offline, immediately sync the new record
+    // Offline records require manager approval before sync
+    if (!isOffline && !newRecord.createdOffline) {
       // Small delay to ensure record is in state
       setTimeout(async () => {
         await syncSingle(newRecord.id);

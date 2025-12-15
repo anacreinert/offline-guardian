@@ -13,6 +13,13 @@ interface WeightOCRResult {
   success: boolean;
 }
 
+interface BothWeightsOCRResult {
+  tare: number | null;
+  gross: number | null;
+  raw: string;
+  success: boolean;
+}
+
 export function useOCR() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,10 +94,47 @@ export function useOCR() {
     }
   };
 
+  const recognizeBothWeights = async (imageDataUrl: string): Promise<BothWeightsOCRResult | null> => {
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('ocr-weight', {
+        body: { imageBase64: imageDataUrl, extractBoth: true },
+      });
+
+      if (fnError) {
+        console.error('OCR both weights function error:', fnError);
+        setError(fnError.message);
+        return null;
+      }
+
+      if (data.error) {
+        setError(data.error);
+        return null;
+      }
+
+      return {
+        tare: data.tare,
+        gross: data.gross,
+        raw: data.raw,
+        success: data.success,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Weight OCR failed';
+      setError(message);
+      console.error('Weight OCR error:', err);
+      return null;
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return {
     isProcessing,
     error,
     recognizePlate,
     recognizeWeight,
+    recognizeBothWeights,
   };
 }

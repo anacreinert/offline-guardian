@@ -9,11 +9,13 @@ import {
   Scale,
   ChevronDown,
   ChevronUp,
-  Filter
+  Filter,
+  Image
 } from 'lucide-react';
 import { WeighingRecord, SyncStatus } from '@/types/weighing';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { PhotoViewer } from '@/components/PhotoViewer';
 
 interface RecordsListProps {
   records: WeighingRecord[];
@@ -103,6 +105,7 @@ export function RecordsList({ records, onRetrySingle, filter, onFilterChange }: 
           const statusConfig = syncStatusConfig[record.syncStatus];
           const StatusIcon = statusConfig.icon;
           const isExpanded = expandedId === record.id;
+          const hasPhotos = record.photoUrls && Object.keys(record.photoUrls).length > 0;
 
           return (
             <div
@@ -135,6 +138,9 @@ export function RecordsList({ records, onRetrySingle, filter, onFilterChange }: 
                   <span className="font-mono font-semibold text-lg">
                     {record.vehiclePlate}
                   </span>
+                  {hasPhotos && (
+                    <Image className="w-4 h-4 text-primary shrink-0" />
+                  )}
                   <span className="text-muted-foreground hidden sm:inline">•</span>
                   <span className="text-muted-foreground truncate hidden sm:inline">
                     {record.product || 'Sem produto'}
@@ -200,6 +206,16 @@ export function RecordsList({ records, onRetrySingle, filter, onFilterChange }: 
                       <span>{record.notes || '-'}</span>
                     </div>
                   </div>
+
+                  {/* Photo Viewer */}
+                  {hasPhotos && (
+                    <div className="mt-4 pt-4 border-t border-border/50">
+                      <PhotoViewer 
+                        photoUrls={record.photoUrls} 
+                        vehiclePlate={record.vehiclePlate} 
+                      />
+                    </div>
+                  )}
 
                   {(record.syncStatus === 'pending' || record.syncStatus === 'error') && (
                     <div className="mt-4 flex justify-end">

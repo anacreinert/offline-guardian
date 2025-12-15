@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle, Clock, Truck, Package, MapPin, XCircle } from 'lucide-react';
+import { CheckCircle, Clock, Truck, Package, MapPin, XCircle, Image } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,13 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { PhotoViewer } from '@/components/PhotoViewer';
+
+interface PhotoUrls {
+  vehiclePlate?: string;
+  tare?: string;
+  product?: string;
+}
 
 interface WeighingRecord {
   id: string;
@@ -37,6 +44,7 @@ interface WeighingRecord {
   rejection_reason?: string | null;
   created_at: string;
   user_id: string;
+  photo_urls?: PhotoUrls | null;
 }
 
 interface ApprovalListProps {
@@ -304,6 +312,16 @@ export function ApprovalList({
                     </div>
                   </div>
                 </div>
+                
+                {/* Photo Viewer */}
+                {record.photo_urls && Object.keys(record.photo_urls).length > 0 && (
+                  <div className="mt-3 pt-3 border-t">
+                    <PhotoViewer 
+                      photoUrls={record.photo_urls} 
+                      vehiclePlate={record.vehicle_plate} 
+                    />
+                  </div>
+                )}
                 
                 {record.notes && (
                   <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">

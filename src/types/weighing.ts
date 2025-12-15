@@ -11,6 +11,12 @@ export interface PhotoData {
   category: PhotoCategory;
 }
 
+export interface PhotoUrls {
+  vehiclePlate?: string;
+  tare?: string;
+  product?: string;
+}
+
 export interface WeighingRecord {
   id: string;
   timestamp: Date;
@@ -24,10 +30,16 @@ export interface WeighingRecord {
   destination: string;
   notes?: string;
   photos?: PhotoData[];
+  photoUrls?: PhotoUrls;
   syncStatus: SyncStatus;
   syncAttempts: number;
   lastSyncAttempt?: Date;
   createdOffline: boolean;
+  approvedAt?: Date;
+  approvedBy?: string;
+  rejectedAt?: Date;
+  rejectedBy?: string;
+  rejectionReason?: string;
 }
 
 export interface SyncQueue {

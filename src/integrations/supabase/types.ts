@@ -72,6 +72,7 @@ export type Database = {
           net_weight: number
           notes: string | null
           origin: string | null
+          photo_urls: Json | null
           product: string | null
           rejected_at: string | null
           rejected_by: string | null
@@ -94,6 +95,7 @@ export type Database = {
           net_weight: number
           notes?: string | null
           origin?: string | null
+          photo_urls?: Json | null
           product?: string | null
           rejected_at?: string | null
           rejected_by?: string | null
@@ -116,6 +118,7 @@ export type Database = {
           net_weight?: number
           notes?: string | null
           origin?: string | null
+          photo_urls?: Json | null
           product?: string | null
           rejected_at?: string | null
           rejected_by?: string | null

@@ -11,6 +11,7 @@ interface CategoryPhotoCaptureProps {
   onPhotoChange: (photo: PhotoData | null) => void;
   onPlateRecognized?: (plate: string) => void;
   onWeightRecognized?: (weight: number) => void;
+  onBothWeightsRecognized?: (tare: number, gross: number) => void;
   label: string;
   disabled?: boolean;
 }
@@ -21,11 +22,12 @@ export function CategoryPhotoCapture({
   onPhotoChange, 
   onPlateRecognized,
   onWeightRecognized,
+  onBothWeightsRecognized,
   label,
   disabled = false 
 }: CategoryPhotoCaptureProps) {
   const { isCapturing, error, takePhoto } = useCamera();
-  const { isProcessing, recognizePlate, recognizeWeight } = useOCR();
+  const { isProcessing, recognizePlate, recognizeBothWeights } = useOCR();
 
   const handleTakePhoto = async () => {
     const captured = await takePhoto();
@@ -52,16 +54,25 @@ export function CategoryPhotoCapture({
         }
       }
 
-      // If this is a tare weight photo, run weight OCR
-      if (category === 'tare' && onWeightRecognized) {
-        toast.info('Processando OCR do peso da tara...');
-        const result = await recognizeWeight(captured.dataUrl, 'tare');
+      // If this is a tare weight photo, run OCR for both weights (same photo has T and PBT)
+      if (category === 'tare' && onBothWeightsRecognized) {
+        toast.info('Processando OCR dos pesos (Tara e PBT)...');
+        const result = await recognizeBothWeights(captured.dataUrl);
         
-        if (result?.success && result.weight) {
-          onWeightRecognized(result.weight);
-          toast.success(`Tara identificada: ${result.weight} kg`);
+        if (result?.success) {
+          if (result.tare !== null && result.gross !== null) {
+            onBothWeightsRecognized(result.tare, result.gross);
+            toast.success(`Tara: ${result.tare} kg | PBT: ${result.gross} kg`);
+          } else if (result.tare !== null) {
+            onWeightRecognized?.(result.tare);
+            toast.success(`Tara identificada: ${result.tare} kg`);
+          } else if (result.gross !== null) {
+            toast.info(`Apenas PBT identificado: ${result.gross} kg`);
+          } else {
+            toast.warning('Não foi possível identificar os pesos automaticamente');
+          }
         } else {
-          toast.warning('Não foi possível identificar a tara automaticamente');
+          toast.warning('Não foi possível identificar os pesos automaticamente');
         }
       }
     } else if (error) {

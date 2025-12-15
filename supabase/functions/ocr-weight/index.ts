@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { imageBase64, weightType } = await req.json();
+    const { imageBase64, extractBoth } = await req.json();
     
     if (!imageBase64) {
       return new Response(
@@ -29,8 +29,44 @@ serve(async (req) => {
       );
     }
 
-    const typeLabel = weightType === 'tare' ? 'TARA (T)' : 'BRUTO (B)';
-    console.log(`Processing weight OCR request for ${typeLabel}...`);
+    console.log(`Processing weight OCR request, extractBoth: ${extractBoth}...`);
+
+    const systemPrompt = extractBoth 
+      ? `Você é um especialista em leitura de displays de balanças industriais.
+Analise a imagem e extraia DOIS valores de peso exibidos no display:
+1. TARA (T) - peso do veículo vazio
+2. PBT (Peso Bruto Total) - peso total com carga
+
+IMPORTANTE:
+- Procure por displays digitais, visores de balança, ou marcações de peso
+- O peso geralmente aparece como número seguido de "kg", "Kg", "KG" ou "t" (toneladas)
+- Indicadores: "T" ou "TARA" para tara, "PBT", "B" ou "BRUTO" para peso bruto
+- Converta toneladas para quilogramas (1t = 1000kg)
+
+Responda no formato JSON exato:
+{"tare": 12500, "gross": 45000}
+
+Se não conseguir identificar algum valor, use null:
+{"tare": 12500, "gross": null}
+ou
+{"tare": null, "gross": 45000}`
+      : `Você é um especialista em leitura de displays de balanças industriais.
+Analise a imagem e extraia o valor de peso exibido no display.
+
+IMPORTANTE:
+- Procure por displays digitais, visores de balança, ou marcações de peso
+- O peso geralmente aparece como número seguido de "kg", "Kg", "KG" ou "t" (toneladas)
+- Identifique especificamente o peso TARA (T) ou PBT (peso bruto) se houver múltiplos valores
+- Indicadores comuns: "T" ou "TARA" para tara, "PBT", "B" ou "BRUTO" para peso bruto
+- Converta toneladas para quilogramas (1t = 1000kg)
+
+Responda APENAS com o valor numérico do peso em quilogramas, sem unidade.
+Exemplo: se o display mostra "12.500 kg" ou "12,5 t", responda: 12500
+Se não conseguir identificar o peso, responda apenas: NAO_IDENTIFICADO`;
+
+    const userPrompt = extractBoth
+      ? `Identifique os valores de TARA (T) e PBT (Peso Bruto Total) exibidos nesta imagem de balança:`
+      : `Identifique o peso exibido nesta imagem de balança:`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -43,26 +79,14 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `Você é um especialista em leitura de displays de balanças industriais.
-Analise a imagem e extraia o valor de peso exibido no display.
-
-IMPORTANTE:
-- Procure por displays digitais, visores de balança, ou marcações de peso
-- O peso geralmente aparece como número seguido de "kg", "Kg", "KG" ou "t" (toneladas)
-- Identifique especificamente o peso ${typeLabel} se houver múltiplos valores
-- Indicadores comuns: "T" ou "TARA" para tara, "B" ou "BRUTO" para peso bruto, "L" ou "LÍQUIDO" para peso líquido
-- Converta toneladas para quilogramas (1t = 1000kg)
-
-Responda APENAS com o valor numérico do peso em quilogramas, sem unidade.
-Exemplo: se o display mostra "12.500 kg" ou "12,5 t", responda: 12500
-Se não conseguir identificar o peso, responda apenas: NAO_IDENTIFICADO`
+            content: systemPrompt
           },
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: `Identifique o peso ${typeLabel} exibido nesta imagem de balança:`
+                text: userPrompt
               },
               {
                 type: "image_url",
@@ -73,7 +97,7 @@ Se não conseguir identificar o peso, responda apenas: NAO_IDENTIFICADO`
             ]
           }
         ],
-        max_tokens: 50,
+        max_tokens: 100,
       }),
     });
 
@@ -105,7 +129,39 @@ Se não conseguir identificar o peso, responda apenas: NAO_IDENTIFICADO`
     
     console.log("OCR weight result:", weightText);
 
-    // Validate and clean the weight text
+    if (extractBoth) {
+      // Parse JSON response for both values
+      try {
+        // Try to extract JSON from the response
+        const jsonMatch = weightText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          return new Response(
+            JSON.stringify({ 
+              tare: parsed.tare !== null && !isNaN(parsed.tare) ? Number(parsed.tare) : null,
+              gross: parsed.gross !== null && !isNaN(parsed.gross) ? Number(parsed.gross) : null,
+              raw: weightText,
+              success: parsed.tare !== null || parsed.gross !== null
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } catch (parseError) {
+        console.error("Error parsing JSON response:", parseError);
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          tare: null,
+          gross: null,
+          raw: weightText,
+          success: false
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Single value response
     const cleanWeight = weightText.replace(/[^0-9.,]/g, "").replace(",", ".");
     const weightValue = parseFloat(cleanWeight);
     
