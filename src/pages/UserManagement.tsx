@@ -46,7 +46,7 @@ const roleColors: Record<AppRole, string> = {
 
 const UserManagement = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, loading, canAccessAdminFeatures } = useAuth();
+  const { isAuthenticated, loading, profile } = useAuth();
   const { toast } = useToast();
   
   const [users, setUsers] = useState<UserWithRole[]>([]);
@@ -55,13 +55,15 @@ const UserManagement = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
 
+  const isAdmin = profile?.role === 'admin';
+
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       navigate('/auth');
       return;
     }
     
-    if (!loading && isAuthenticated && !canAccessAdminFeatures()) {
+    if (!loading && profile && !isAdmin) {
       toast({
         title: 'Acesso negado',
         description: 'Você não tem permissão para acessar esta página.',
@@ -71,10 +73,10 @@ const UserManagement = () => {
       return;
     }
 
-    if (isAuthenticated && canAccessAdminFeatures()) {
+    if (!loading && isAuthenticated && isAdmin) {
       fetchUsers();
     }
-  }, [isAuthenticated, loading, canAccessAdminFeatures, navigate]);
+  }, [isAuthenticated, loading, profile, isAdmin, navigate]);
 
   useEffect(() => {
     const filtered = users.filter(user => 
