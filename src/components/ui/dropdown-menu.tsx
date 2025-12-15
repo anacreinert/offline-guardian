@@ -49,9 +49,7 @@ const DropdownMenuSubContent = React.forwardRef<
     )}
     {...props}
   >
-    <div className="max-h-[240px] overflow-y-auto scrollbar-thin">
-      {children}
-    </div>
+    {children}
   </DropdownMenuPrimitive.SubContent>
 ));
 DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayName;
@@ -70,9 +68,7 @@ const DropdownMenuContent = React.forwardRef<
       )}
       {...props}
     >
-      <div className="max-h-[240px] overflow-y-auto scrollbar-thin">
-        {children}
-      </div>
+      {children}
     </DropdownMenuPrimitive.Content>
   </DropdownMenuPrimitive.Portal>
 ));
