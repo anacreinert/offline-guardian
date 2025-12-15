@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, CheckCircle, Clock, ArrowLeft, Calendar, Users, Scale, XCircle } from 'lucide-react';
+import { FileText, CheckCircle, Clock, ArrowLeft, Calendar, Scale, XCircle } from 'lucide-react';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { UserMenu } from '@/components/UserMenu';
 import { ApprovalList } from '@/components/ApprovalList';
 import { DailyReportSummary } from '@/components/DailyReportSummary';
+import { PhotoViewer } from '@/components/PhotoViewer';
 
 interface PhotoUrls {
   vehiclePlate?: string;
@@ -460,13 +461,19 @@ const Reports = () => {
                               )}
                             </div>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right flex flex-col items-end gap-2">
                             <div className="text-lg font-bold text-primary">
                               {Number(record.net_weight).toLocaleString('pt-BR')} kg
                             </div>
                             <div className="text-xs text-muted-foreground">
                               Bruto: {Number(record.gross_weight).toLocaleString('pt-BR')} kg
                             </div>
+                            {record.photo_urls && Object.keys(record.photo_urls).length > 0 && (
+                              <PhotoViewer 
+                                photoUrls={record.photo_urls} 
+                                vehiclePlate={record.vehicle_plate} 
+                              />
+                            )}
                           </div>
                         </div>
                       </div>
@@ -531,13 +538,19 @@ const Reports = () => {
                               </p>
                             </div>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right flex flex-col items-end gap-2">
                             <div className="text-lg font-bold text-primary">
                               {Number(record.net_weight).toLocaleString('pt-BR')} kg
                             </div>
                             <div className="text-xs text-muted-foreground">
                               Bruto: {Number(record.gross_weight).toLocaleString('pt-BR')} kg
                             </div>
+                            {record.photo_urls && Object.keys(record.photo_urls).length > 0 && (
+                              <PhotoViewer 
+                                photoUrls={record.photo_urls} 
+                                vehiclePlate={record.vehicle_plate} 
+                              />
+                            )}
                           </div>
                         </div>
                       </div>
