@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { Scale, Wifi, Clock, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +15,8 @@ export function MetricsCards({
   pendingSyncCount,
   lastSyncTime,
 }: MetricsCardsProps) {
+  const navigate = useNavigate();
+
   const metrics = [
     {
       label: 'Pesagens Hoje',
@@ -21,6 +24,8 @@ export function MetricsCards({
       icon: Scale,
       color: 'text-primary',
       bgColor: 'bg-primary/10',
+      clickable: true,
+      filter: 'all',
     },
     {
       label: 'Registros Offline',
@@ -28,6 +33,8 @@ export function MetricsCards({
       icon: Wifi,
       color: 'text-status-offline',
       bgColor: 'bg-status-offline/10',
+      clickable: true,
+      filter: 'offline',
     },
     {
       label: 'Pendentes Sinc.',
@@ -35,6 +42,8 @@ export function MetricsCards({
       icon: Clock,
       color: pendingSyncCount > 0 ? 'text-status-offline' : 'text-status-online',
       bgColor: pendingSyncCount > 0 ? 'bg-status-offline/10' : 'bg-status-online/10',
+      clickable: true,
+      filter: 'pending',
     },
     {
       label: 'Última Sincronização',
@@ -45,8 +54,15 @@ export function MetricsCards({
       color: 'text-accent',
       bgColor: 'bg-accent/10',
       isTime: true,
+      clickable: false,
     },
   ];
+
+  const handleCardClick = (filter?: string) => {
+    if (filter) {
+      navigate(`/records?filter=${filter}`);
+    }
+  };
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -55,7 +71,11 @@ export function MetricsCards({
         return (
           <div
             key={metric.label}
-            className="metric-card animate-fade-in"
+            onClick={() => metric.clickable && handleCardClick(metric.filter)}
+            className={cn(
+              "metric-card animate-fade-in",
+              metric.clickable && "cursor-pointer hover:scale-[1.02] hover:shadow-lg transition-all duration-200"
+            )}
             style={{ animationDelay: `${index * 100}ms` }}
           >
             <div className="flex items-start justify-between mb-4">
