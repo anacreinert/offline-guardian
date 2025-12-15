@@ -1,4 +1,4 @@
-import { Scale, Wifi, Clock, CheckCircle } from 'lucide-react';
+import { Scale, Wifi, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface DailySummary {
@@ -7,6 +7,7 @@ interface DailySummary {
   offlineRecords: number;
   pendingApproval: number;
   approvedRecords: number;
+  rejectedRecords: number;
 }
 
 interface DailyReportSummaryProps {
@@ -33,15 +34,7 @@ export function DailyReportSummary({ summary, isLoading }: DailyReportSummaryPro
       bgColor: 'bg-primary/10',
     },
     {
-      title: 'Pesagens Offline',
-      value: summary.offlineRecords,
-      suffix: '',
-      icon: Wifi,
-      color: 'text-status-offline',
-      bgColor: 'bg-status-offline/10',
-    },
-    {
-      title: 'Pendentes Aprovação',
+      title: 'Pendentes',
       value: summary.pendingApproval,
       suffix: '',
       icon: Clock,
@@ -55,6 +48,14 @@ export function DailyReportSummary({ summary, isLoading }: DailyReportSummaryPro
       icon: CheckCircle,
       color: 'text-status-synced',
       bgColor: 'bg-status-synced/10',
+    },
+    {
+      title: 'Rejeitadas',
+      value: summary.rejectedRecords,
+      suffix: '',
+      icon: XCircle,
+      color: 'text-destructive',
+      bgColor: 'bg-destructive/10',
     },
   ];
 

@@ -42,6 +42,7 @@ interface DailySummary {
   offlineRecords: number;
   pendingApproval: number;
   approvedRecords: number;
+  rejectedRecords: number;
 }
 
 const Reports = () => {
@@ -57,6 +58,7 @@ const Reports = () => {
     offlineRecords: 0,
     pendingApproval: 0,
     approvedRecords: 0,
+    rejectedRecords: 0,
   });
 
   // Only gestor role can access this page
@@ -103,8 +105,9 @@ const Reports = () => {
 
       // Calculate summary
       const offlineRecords = fetchedRecords.filter(r => r.created_offline);
-      const pendingApproval = offlineRecords.filter(r => !r.approved_at);
+      const pendingApproval = offlineRecords.filter(r => !r.approved_at && !r.rejected_at);
       const approvedRecords = offlineRecords.filter(r => r.approved_at);
+      const rejectedRecords = offlineRecords.filter(r => r.rejected_at);
       const totalNetWeight = fetchedRecords.reduce((sum, r) => sum + Number(r.net_weight), 0);
 
       setDailySummary({
@@ -113,6 +116,7 @@ const Reports = () => {
         offlineRecords: offlineRecords.length,
         pendingApproval: pendingApproval.length,
         approvedRecords: approvedRecords.length,
+        rejectedRecords: rejectedRecords.length,
       });
     } catch (error) {
       console.error('Error fetching records:', error);
@@ -228,6 +232,63 @@ const Reports = () => {
     }
   };
 
+  const handleApproveSelected = async (ids: string[]) => {
+    try {
+      const { error } = await supabase
+        .from('weighing_records')
+        .update({
+          approved_at: new Date().toISOString(),
+          approved_by: profile?.user_id,
+        })
+        .in('id', ids);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Pesagens aprovadas',
+        description: `${ids.length} registro(s) aprovado(s) com sucesso.`,
+      });
+
+      fetchRecords();
+    } catch (error) {
+      console.error('Error approving selected records:', error);
+      toast({
+        title: 'Erro ao aprovar',
+        description: 'Não foi possível aprovar os registros selecionados.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRejectSelected = async (ids: string[], reason: string) => {
+    try {
+      const { error } = await supabase
+        .from('weighing_records')
+        .update({
+          rejected_at: new Date().toISOString(),
+          rejected_by: profile?.user_id,
+          rejection_reason: reason || null,
+        })
+        .in('id', ids);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Pesagens rejeitadas',
+        description: `${ids.length} registro(s) rejeitado(s).`,
+      });
+
+      fetchRecords();
+    } catch (error) {
+      console.error('Error rejecting selected records:', error);
+      toast({
+        title: 'Erro ao rejeitar',
+        description: 'Não foi possível rejeitar os registros selecionados.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleApproveAll = async () => {
     try {
       const pendingRecords = records.filter(r => r.created_offline && !r.approved_at && !r.rejected_at);
@@ -334,6 +395,8 @@ const Reports = () => {
               onReject={handleReject}
               onApproveAll={handleApproveAll}
               onRejectAll={handleRejectAll}
+              onApproveSelected={handleApproveSelected}
+              onRejectSelected={handleRejectSelected}
               isLoading={isLoading}
             />
           </TabsContent>
