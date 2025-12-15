@@ -196,12 +196,19 @@ const UserManagement = () => {
       if (authError) throw authError;
 
       if (authData.user) {
+        // Wait a moment for the trigger to create the user_roles record
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         // Update role if not default
         if (newUserData.role !== 'operador') {
           const { error: roleError } = await supabase
             .from('user_roles')
-            .update({ role: newUserData.role })
-            .eq('user_id', authData.user.id);
+            .upsert({ 
+              user_id: authData.user.id, 
+              role: newUserData.role 
+            }, { 
+              onConflict: 'user_id' 
+            });
 
           if (roleError) throw roleError;
         }
