@@ -113,6 +113,14 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
     setFormData(prev => ({ ...prev, tareWeight: weight.toFixed(3) }));
   };
 
+  const handleBothWeightsRecognized = (tare: number, gross: number) => {
+    setFormData(prev => ({ 
+      ...prev, 
+      tareWeight: tare.toFixed(3),
+      grossWeight: gross.toFixed(3)
+    }));
+  };
+
   const formatWeight = (value: string): string => {
     // Remove non-numeric characters except decimal point
     const cleanValue = value.replace(/[^\d.]/g, '');
@@ -334,7 +342,8 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
               photo={tarePhoto}
               onPhotoChange={setTarePhoto}
               onWeightRecognized={handleTareRecognized}
-              label="tara"
+              onBothWeightsRecognized={handleBothWeightsRecognized}
+              label="tara/pbt"
             />
           </div>
         </div>

@@ -78,6 +78,12 @@ export function useWeighingRecords() {
         syncStatus: 'synced' as const,
         syncAttempts: 0,
         createdOffline: r.created_offline || false,
+        photoUrls: r.photo_urls as { vehiclePlate?: string; tare?: string; product?: string } | undefined,
+        approvedAt: r.approved_at ? new Date(r.approved_at) : undefined,
+        approvedBy: r.approved_by || undefined,
+        rejectedAt: r.rejected_at ? new Date(r.rejected_at) : undefined,
+        rejectedBy: r.rejected_by || undefined,
+        rejectionReason: r.rejection_reason || undefined,
       }));
     } catch (error) {
       console.error('Error fetching records from database:', error);

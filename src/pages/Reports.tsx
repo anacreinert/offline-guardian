@@ -14,6 +14,12 @@ import { UserMenu } from '@/components/UserMenu';
 import { ApprovalList } from '@/components/ApprovalList';
 import { DailyReportSummary } from '@/components/DailyReportSummary';
 
+interface PhotoUrls {
+  vehiclePlate?: string;
+  tare?: string;
+  product?: string;
+}
+
 interface WeighingRecord {
   id: string;
   vehicle_plate: string;
@@ -34,6 +40,7 @@ interface WeighingRecord {
   rejection_reason: string | null;
   created_at: string;
   user_id: string;
+  photo_urls: PhotoUrls | null;
 }
 
 interface DailySummary {
