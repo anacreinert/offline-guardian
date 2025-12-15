@@ -73,6 +73,9 @@ export type Database = {
           notes: string | null
           origin: string | null
           product: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
           synced_at: string | null
           tare_weight: number
           updated_at: string
@@ -92,6 +95,9 @@ export type Database = {
           notes?: string | null
           origin?: string | null
           product?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
           synced_at?: string | null
           tare_weight: number
           updated_at?: string
@@ -111,6 +117,9 @@ export type Database = {
           notes?: string | null
           origin?: string | null
           product?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
           synced_at?: string | null
           tare_weight?: number
           updated_at?: string
