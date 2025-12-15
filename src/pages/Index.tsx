@@ -7,7 +7,7 @@ import { RecordsList } from '@/components/RecordsList';
 import { MetricsCards } from '@/components/MetricsCards';
 import { UserMenu } from '@/components/UserMenu';
 import { useConnectionStatus } from '@/hooks/useConnectionStatus';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useWeighingRecords } from '@/hooks/useWeighingRecords';
 import { useSyncManager } from '@/hooks/useSyncManager';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -31,7 +31,8 @@ const Index = () => {
     getPendingRecords,
     getTodayRecords,
     setSyncQueue,
-  } = useLocalStorage();
+    refreshRecords,
+  } = useWeighingRecords();
 
   const { syncAll, syncSingle } = useSyncManager({
     getPendingRecords,
@@ -57,12 +58,14 @@ const Index = () => {
   useEffect(() => {
     if (!isOffline && syncQueue.pendingCount > 0 && !syncQueue.isProcessing) {
       // Small delay to ensure stable connection
-      const timer = setTimeout(() => {
-        syncAll();
+      const timer = setTimeout(async () => {
+        await syncAll();
+        // Refresh records from database after sync
+        refreshRecords();
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [isOffline, syncQueue.pendingCount, syncQueue.isProcessing, syncAll]);
+  }, [isOffline, syncQueue.pendingCount, syncQueue.isProcessing, syncAll, refreshRecords]);
 
   const handleSubmit = async (data: Parameters<typeof addRecord>[0]) => {
     const newRecord = addRecord(data, isOffline);
@@ -70,8 +73,10 @@ const Index = () => {
     // If online, immediately sync the new record
     if (!isOffline) {
       // Small delay to ensure record is in state
-      setTimeout(() => {
-        syncSingle(newRecord.id);
+      setTimeout(async () => {
+        await syncSingle(newRecord.id);
+        // Refresh to get updated records
+        refreshRecords();
       }, 100);
     }
   };
