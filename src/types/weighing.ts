@@ -2,10 +2,13 @@ export type ConnectionStatus = 'online' | 'offline' | 'syncing' | 'error';
 
 export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'error';
 
+export type PhotoCategory = 'vehiclePlate' | 'tare' | 'product';
+
 export interface PhotoData {
   dataUrl: string;
   format: string;
   timestamp: Date;
+  category: PhotoCategory;
 }
 
 export interface WeighingRecord {

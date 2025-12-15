@@ -14,8 +14,7 @@ import {
 import { WeighingRecord, PhotoData } from '@/types/weighing';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { CameraCapture } from '@/components/CameraCapture';
-import { CapturedPhoto } from '@/hooks/useCamera';
+import { CategoryPhotoCapture } from '@/components/CategoryPhotoCapture';
 
 // Santa Catarina cities
 const SC_CITIES = [
@@ -78,7 +77,10 @@ interface WeighingFormProps {
 }
 
 export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
-  const [photos, setPhotos] = useState<CapturedPhoto[]>([]);
+  const [vehiclePlatePhoto, setVehiclePlatePhoto] = useState<PhotoData | null>(null);
+  const [tarePhoto, setTarePhoto] = useState<PhotoData | null>(null);
+  const [productPhoto, setProductPhoto] = useState<PhotoData | null>(null);
+  
   const [formData, setFormData] = useState({
     vehiclePlate: '',
     driverName: '',
@@ -143,11 +145,11 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
       return;
     }
 
-    const photoData: PhotoData[] = photos.map(p => ({
-      dataUrl: p.dataUrl,
-      format: p.format,
-      timestamp: p.timestamp,
-    }));
+    const photos: PhotoData[] = [
+      vehiclePlatePhoto,
+      tarePhoto,
+      productPhoto,
+    ].filter((p): p is PhotoData => p !== null);
 
     onSubmit({
       vehiclePlate: formData.vehiclePlate.toUpperCase(),
@@ -159,7 +161,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
       origin: formData.origin,
       destination: formData.destination,
       notes: formData.notes,
-      photos: photoData.length > 0 ? photoData : undefined,
+      photos: photos.length > 0 ? photos : undefined,
     });
 
     // Reset form
@@ -173,7 +175,9 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
       destination: '',
       notes: '',
     });
-    setPhotos([]);
+    setVehiclePlatePhoto(null);
+    setTarePhoto(null);
+    setProductPhoto(null);
 
     toast.success(
       isOffline 
@@ -213,15 +217,23 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
             <Truck className="w-4 h-4 text-muted-foreground" />
             Placa do Veículo *
           </Label>
-          <Input
-            id="vehiclePlate"
-            name="vehiclePlate"
-            value={formData.vehiclePlate}
-            onChange={handleChange}
-            placeholder="ABC1D23 ou ABC-1234"
-            className="uppercase font-mono text-lg"
-            maxLength={8}
-          />
+          <div className="flex gap-2">
+            <Input
+              id="vehiclePlate"
+              name="vehiclePlate"
+              value={formData.vehiclePlate}
+              onChange={handleChange}
+              placeholder="ABC1D23 ou ABC-1234"
+              className="uppercase font-mono text-lg flex-1"
+              maxLength={8}
+            />
+            <CategoryPhotoCapture
+              category="vehiclePlate"
+              photo={vehiclePlatePhoto}
+              onPhotoChange={setVehiclePlatePhoto}
+              label="placa"
+            />
+          </div>
           <p className="text-xs text-muted-foreground">Formato Mercosul (ABC1D23) ou antigo (ABC-1234)</p>
         </div>
 
@@ -246,21 +258,29 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
             <Package className="w-4 h-4 text-muted-foreground" />
             Produto
           </Label>
-          <Select
-            value={formData.product}
-            onValueChange={(value) => handleSelectChange('product', value)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Selecione o produto" />
-            </SelectTrigger>
-            <SelectContent className="bg-background border z-50">
-              {AGRO_PRODUCTS.map((product) => (
-                <SelectItem key={product} value={product}>
-                  {product}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Select
+              value={formData.product}
+              onValueChange={(value) => handleSelectChange('product', value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione o produto" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border z-50">
+                {AGRO_PRODUCTS.map((product) => (
+                  <SelectItem key={product} value={product}>
+                    {product}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <CategoryPhotoCapture
+              category="product"
+              photo={productPhoto}
+              onPhotoChange={setProductPhoto}
+              label="produto"
+            />
+          </div>
         </div>
 
         {/* Gross Weight */}
@@ -288,17 +308,25 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
             <Scale className="w-4 h-4 text-muted-foreground" />
             Tara (kg) *
           </Label>
-          <Input
-            id="tareWeight"
-            name="tareWeight"
-            type="text"
-            inputMode="decimal"
-            value={formData.tareWeight}
-            onChange={handleWeightChange}
-            onBlur={handleWeightBlur}
-            placeholder="0,000"
-            className="font-mono text-lg"
-          />
+          <div className="flex gap-2">
+            <Input
+              id="tareWeight"
+              name="tareWeight"
+              type="text"
+              inputMode="decimal"
+              value={formData.tareWeight}
+              onChange={handleWeightChange}
+              onBlur={handleWeightBlur}
+              placeholder="0,000"
+              className="font-mono text-lg flex-1"
+            />
+            <CategoryPhotoCapture
+              category="tare"
+              photo={tarePhoto}
+              onPhotoChange={setTarePhoto}
+              label="tara"
+            />
+          </div>
         </div>
 
         {/* Net Weight Display */}
@@ -375,15 +403,6 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
             onChange={handleChange}
             placeholder="Informações adicionais..."
             rows={3}
-          />
-        </div>
-
-        {/* Camera Capture */}
-        <div className="space-y-2 md:col-span-2">
-          <CameraCapture
-            photos={photos}
-            onPhotosChange={setPhotos}
-            maxPhotos={3}
           />
         </div>
       </div>
