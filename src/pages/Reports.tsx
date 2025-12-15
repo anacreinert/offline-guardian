@@ -69,9 +69,9 @@ const Reports = () => {
     rejectedRecords: 0,
   });
 
-  // Only gestor role can access this page
+  // Only gestor/admin roles can access this page
   const isProfileReady = !!profile;
-  const isGestor = profile?.role === 'gestor';
+  const canAccessReports = profile?.role === 'gestor' || profile?.role === 'admin';
 
   // Redirect if not authenticated or doesn't have permission
   useEffect(() => {
@@ -81,15 +81,15 @@ const Reports = () => {
     }
 
     // Wait for profile to load before applying role-based redirects
-    if (!loading && isAuthenticated && isProfileReady && !isGestor) {
+    if (!loading && isAuthenticated && isProfileReady && !canAccessReports) {
       navigate('/');
       toast({
         title: 'Acesso negado',
-        description: 'Apenas gestores podem acessar esta página.',
+        description: 'Apenas gestores e admins podem acessar esta página.',
         variant: 'destructive',
       });
     }
-  }, [isAuthenticated, loading, navigate, isGestor, isProfileReady, toast]);
+  }, [isAuthenticated, loading, navigate, canAccessReports, isProfileReady, toast]);
 
   // Fetch all records
   const fetchRecords = async () => {
@@ -139,10 +139,10 @@ const Reports = () => {
   };
 
   useEffect(() => {
-    if (isAuthenticated && isGestor) {
+    if (isAuthenticated && canAccessReports) {
       fetchRecords();
     }
-  }, [isAuthenticated, isGestor]);
+  }, [isAuthenticated, canAccessReports]);
 
   const handleApprove = async (recordId: string) => {
     try {
@@ -343,8 +343,45 @@ const Reports = () => {
     );
   }
 
-  if (!isAuthenticated || !isGestor) {
-    return null;
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Acesso ao relatório</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Faça login para acessar Relatórios e Aprovações.
+            </p>
+            <Button className="w-full" onClick={() => navigate('/auth')}>
+              Ir para login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!canAccessReports) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Acesso negado</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Seu usuário não tem permissão para acessar esta página.
+            </p>
+            <Button className="w-full" variant="outline" onClick={() => navigate('/')}
+            >
+              Voltar
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   const offlineRecords = records.filter(r => r.created_offline);
