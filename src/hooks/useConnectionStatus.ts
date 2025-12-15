@@ -6,29 +6,20 @@ export function useConnectionStatus() {
   const [lastOnline, setLastOnline] = useState<Date | null>(null);
 
   const checkConnection = useCallback(async () => {
-    try {
-      // Try to reach a reliable endpoint
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      await fetch('https://www.google.com/favicon.ico', {
-        mode: 'no-cors',
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (status !== 'syncing') {
-        setStatus('online');
-        setLastOnline(new Date());
-      }
-      return true;
-    } catch {
+    // Use browser's native online/offline detection
+    if (!navigator.onLine) {
       if (status !== 'syncing') {
         setStatus('offline');
       }
       return false;
     }
+    
+    // If browser says we're online, trust it
+    if (status !== 'syncing') {
+      setStatus('online');
+      setLastOnline(new Date());
+    }
+    return true;
   }, [status]);
 
   useEffect(() => {
@@ -48,8 +39,8 @@ export function useConnectionStatus() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Periodic check every 10 seconds
-    const interval = setInterval(checkConnection, 10000);
+    // Periodic check every 30 seconds
+    const interval = setInterval(checkConnection, 30000);
 
     return () => {
       window.removeEventListener('online', handleOnline);

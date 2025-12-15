@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { WeighingRecord } from '@/types/weighing';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface SyncManagerOptions {
@@ -23,19 +24,57 @@ export function useSyncManager({
 }: SyncManagerOptions) {
   const isSyncing = useRef(false);
 
-  const simulateSync = async (record: WeighingRecord): Promise<boolean> => {
-    // Simulate network request with random delay
-    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
-    
-    // 95% success rate simulation
-    return Math.random() > 0.05;
+  const syncToDatabase = async (record: WeighingRecord): Promise<boolean> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('User not authenticated');
+        return false;
+      }
+
+      const { error } = await supabase
+        .from('weighing_records')
+        .insert({
+          id: record.id,
+          user_id: user.id,
+          vehicle_plate: record.vehiclePlate,
+          driver_name: record.driverName || null,
+          product: record.product || null,
+          gross_weight: record.grossWeight,
+          tare_weight: record.tareWeight,
+          net_weight: record.netWeight,
+          origin: record.origin || null,
+          destination: record.destination || null,
+          notes: record.notes || null,
+          created_offline: record.createdOffline,
+          synced_at: new Date().toISOString(),
+          created_at: record.timestamp.toISOString(),
+        });
+
+      if (error) {
+        // If record already exists, consider it synced
+        if (error.code === '23505') {
+          console.log('Record already exists in database:', record.id);
+          return true;
+        }
+        console.error('Error syncing record:', error);
+        return false;
+      }
+
+      console.log('Record synced successfully:', record.id);
+      return true;
+    } catch (error) {
+      console.error('Error syncing record:', error);
+      return false;
+    }
   };
 
   const syncRecord = useCallback(async (record: WeighingRecord) => {
     updateRecordSyncStatus(record.id, 'syncing');
     
     try {
-      const success = await simulateSync(record);
+      const success = await syncToDatabase(record);
       
       if (success) {
         updateRecordSyncStatus(record.id, 'synced');

@@ -59,6 +59,60 @@ export type Database = {
         }
         Relationships: []
       }
+      weighing_records: {
+        Row: {
+          created_at: string
+          created_offline: boolean | null
+          destination: string | null
+          driver_name: string | null
+          gross_weight: number
+          id: string
+          net_weight: number
+          notes: string | null
+          origin: string | null
+          product: string | null
+          synced_at: string | null
+          tare_weight: number
+          updated_at: string
+          user_id: string
+          vehicle_plate: string
+        }
+        Insert: {
+          created_at?: string
+          created_offline?: boolean | null
+          destination?: string | null
+          driver_name?: string | null
+          gross_weight: number
+          id?: string
+          net_weight: number
+          notes?: string | null
+          origin?: string | null
+          product?: string | null
+          synced_at?: string | null
+          tare_weight: number
+          updated_at?: string
+          user_id: string
+          vehicle_plate: string
+        }
+        Update: {
+          created_at?: string
+          created_offline?: boolean | null
+          destination?: string | null
+          driver_name?: string | null
+          gross_weight?: number
+          id?: string
+          net_weight?: number
+          notes?: string | null
+          origin?: string | null
+          product?: string | null
+          synced_at?: string | null
+          tare_weight?: number
+          updated_at?: string
+          user_id?: string
+          vehicle_plate?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
