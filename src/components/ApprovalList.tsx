@@ -43,11 +43,13 @@ interface ApprovalListProps {
   onApprove: (id: string) => void;
   onReject: (id: string, reason: string) => void;
   onApproveAll: () => void;
+  onRejectAll: (reason: string) => void;
   isLoading: boolean;
 }
 
-export function ApprovalList({ records, onApprove, onReject, onApproveAll, isLoading }: ApprovalListProps) {
+export function ApprovalList({ records, onApprove, onReject, onApproveAll, onRejectAll, isLoading }: ApprovalListProps) {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectAllDialogOpen, setRejectAllDialogOpen] = useState(false);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
@@ -68,6 +70,15 @@ export function ApprovalList({ records, onApprove, onReject, onApproveAll, isLoa
     setSelectedRecordId(null);
     setRejectionReason('');
   };
+
+  const handleConfirmRejectAll = async () => {
+    setIsRejecting(true);
+    await onRejectAll(rejectionReason);
+    setIsRejecting(false);
+    setRejectAllDialogOpen(false);
+    setRejectionReason('');
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -96,10 +107,21 @@ export function ApprovalList({ records, onApprove, onReject, onApproveAll, isLoa
           Pesagens Offline Pendentes
         </CardTitle>
         {records.length > 0 && (
-          <Button onClick={onApproveAll} size="sm" className="gap-2">
-            <CheckCircle className="w-4 h-4" />
-            Aprovar Todos ({records.length})
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => setRejectAllDialogOpen(true)}
+            >
+              <XCircle className="w-4 h-4" />
+              Rejeitar Todos
+            </Button>
+            <Button onClick={onApproveAll} size="sm" className="gap-2">
+              <CheckCircle className="w-4 h-4" />
+              Aprovar Todos ({records.length})
+            </Button>
+          </div>
         )}
       </CardHeader>
       <CardContent>
@@ -226,6 +248,43 @@ export function ApprovalList({ records, onApprove, onReject, onApproveAll, isLoa
               disabled={isRejecting}
             >
               {isRejecting ? 'Rejeitando...' : 'Confirmar Rejeição'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject All Dialog */}
+      <Dialog open={rejectAllDialogOpen} onOpenChange={setRejectAllDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rejeitar Todas as Pesagens</DialogTitle>
+            <DialogDescription>
+              Você está prestes a rejeitar {records.length} pesagem(ns) pendente(s). 
+              Informe o motivo da rejeição em massa.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rejection-all-reason">Motivo da Rejeição</Label>
+              <Textarea
+                id="rejection-all-reason"
+                placeholder="Descreva o motivo da rejeição..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectAllDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleConfirmRejectAll}
+              disabled={isRejecting}
+            >
+              {isRejecting ? 'Rejeitando...' : `Rejeitar Todos (${records.length})`}
             </Button>
           </DialogFooter>
         </DialogContent>

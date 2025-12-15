@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, CheckCircle, Clock, ArrowLeft, Calendar, Users, Scale } from 'lucide-react';
+import { FileText, CheckCircle, Clock, ArrowLeft, Calendar, Users, Scale, XCircle } from 'lucide-react';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -189,9 +189,48 @@ const Reports = () => {
     }
   };
 
+  const handleRejectAll = async (reason: string) => {
+    try {
+      const pendingRecords = records.filter(r => r.created_offline && !r.approved_at && !r.rejected_at);
+      
+      if (pendingRecords.length === 0) {
+        toast({
+          title: 'Nenhum registro pendente',
+          description: 'Não há registros offline para rejeitar.',
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('weighing_records')
+        .update({
+          rejected_at: new Date().toISOString(),
+          rejected_by: profile?.user_id,
+          rejection_reason: reason || null,
+        })
+        .in('id', pendingRecords.map(r => r.id));
+
+      if (error) throw error;
+
+      toast({
+        title: 'Todos rejeitados',
+        description: `${pendingRecords.length} registros foram rejeitados.`,
+      });
+
+      fetchRecords();
+    } catch (error) {
+      console.error('Error rejecting all records:', error);
+      toast({
+        title: 'Erro ao rejeitar',
+        description: 'Não foi possível rejeitar os registros.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleApproveAll = async () => {
     try {
-      const pendingRecords = records.filter(r => r.created_offline && !r.approved_at);
+      const pendingRecords = records.filter(r => r.created_offline && !r.approved_at && !r.rejected_at);
       
       if (pendingRecords.length === 0) {
         toast({
@@ -273,14 +312,18 @@ const Reports = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="pending" className="mt-8">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-lg grid-cols-3">
             <TabsTrigger value="pending" className="gap-2">
               <Clock className="w-4 h-4" />
               Pendentes ({pendingApprovalRecords.length})
             </TabsTrigger>
+            <TabsTrigger value="rejected" className="gap-2">
+              <XCircle className="w-4 h-4" />
+              Rejeitados ({rejectedRecords.length})
+            </TabsTrigger>
             <TabsTrigger value="all" className="gap-2">
               <Scale className="w-4 h-4" />
-              Todos do Dia ({records.length})
+              Todos ({records.length})
             </TabsTrigger>
           </TabsList>
 
@@ -290,8 +333,78 @@ const Reports = () => {
               onApprove={handleApprove}
               onReject={handleReject}
               onApproveAll={handleApproveAll}
+              onRejectAll={handleRejectAll}
               isLoading={isLoading}
             />
+          </TabsContent>
+
+          <TabsContent value="rejected" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <XCircle className="w-5 h-5 text-destructive" />
+                  Pesagens Rejeitadas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
+                    ))}
+                  </div>
+                ) : rejectedRecords.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <CheckCircle className="w-12 h-12 mx-auto mb-4 text-status-synced opacity-50" />
+                    <p className="font-medium">Nenhuma pesagem rejeitada</p>
+                    <p className="text-sm mt-1">Todas as pesagens foram aprovadas ou estão pendentes.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {rejectedRecords.map(record => (
+                      <div
+                        key={record.id}
+                        className="p-4 rounded-lg border border-destructive/30 bg-destructive/5"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-semibold">{record.vehicle_plate}</span>
+                              <Badge variant="destructive" className="text-xs">
+                                Rejeitado
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-muted-foreground space-y-0.5">
+                              {record.driver_name && <p>Motorista: {record.driver_name}</p>}
+                              {record.product && <p>Produto: {record.product}</p>}
+                              <p>
+                                {format(new Date(record.created_at), 'HH:mm', { locale: ptBR })}
+                                {record.origin && record.destination && (
+                                  <span> • {record.origin} → {record.destination}</span>
+                                )}
+                              </p>
+                              {record.rejection_reason && (
+                                <p className="mt-2 text-destructive">
+                                  <span className="font-medium">Motivo:</span> {record.rejection_reason}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-primary">
+                              {Number(record.net_weight).toLocaleString('pt-BR')} kg
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Bruto: {Number(record.gross_weight).toLocaleString('pt-BR')} kg
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="all" className="mt-6">
