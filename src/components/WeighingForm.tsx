@@ -80,11 +80,13 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
   const [vehiclePlatePhoto, setVehiclePlatePhoto] = useState<PhotoData | null>(null);
   const [tarePhoto, setTarePhoto] = useState<PhotoData | null>(null);
   const [productPhoto, setProductPhoto] = useState<PhotoData | null>(null);
+  const [scalePhoto, setScalePhoto] = useState<PhotoData | null>(null);
   
   const [formData, setFormData] = useState({
     vehiclePlate: '',
     driverName: '',
     product: '',
+    scaleWeight: '',
     grossWeight: '',
     tareWeight: '',
     origin: '',
@@ -119,6 +121,10 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
       tareWeight: tare.toFixed(3),
       grossWeight: gross.toFixed(3)
     }));
+  };
+
+  const handleScaleWeightRecognized = (weight: number) => {
+    setFormData(prev => ({ ...prev, scaleWeight: weight.toFixed(3) }));
   };
 
   const handleProductRecognized = (product: string) => {
@@ -169,6 +175,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
       vehiclePlatePhoto,
       tarePhoto,
       productPhoto,
+      scalePhoto,
     ].filter((p): p is PhotoData => p !== null);
 
     onSubmit({
@@ -189,6 +196,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
       vehiclePlate: '',
       driverName: '',
       product: '',
+      scaleWeight: '',
       grossWeight: '',
       tareWeight: '',
       origin: '',
@@ -198,6 +206,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
     setVehiclePlatePhoto(null);
     setTarePhoto(null);
     setProductPhoto(null);
+    setScalePhoto(null);
 
     toast.success(
       isOffline 
@@ -301,6 +310,34 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
               onPhotoChange={setProductPhoto}
               onProductRecognized={handleProductRecognized}
               label="produto"
+            />
+          </div>
+        </div>
+
+        {/* Scale Weight */}
+        <div className="space-y-2">
+          <Label htmlFor="scaleWeight" className="flex items-center gap-2">
+            <Scale className="w-4 h-4 text-muted-foreground" />
+            Peso da Balança (kg)
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              id="scaleWeight"
+              name="scaleWeight"
+              type="text"
+              inputMode="decimal"
+              value={formData.scaleWeight}
+              onChange={handleWeightChange}
+              onBlur={handleWeightBlur}
+              placeholder="0,000"
+              className="font-mono text-lg flex-1"
+            />
+            <CategoryPhotoCapture
+              category="tare"
+              photo={scalePhoto}
+              onPhotoChange={setScalePhoto}
+              onWeightRecognized={handleScaleWeightRecognized}
+              label="balança"
             />
           </div>
         </div>
