@@ -141,29 +141,38 @@ export function useSyncManager({
 
   const syncSingle = useCallback(async (recordId: string) => {
     if (!isOnline) {
-      toast.error('Sem conexão com a rede');
+      console.log('Cannot sync - offline');
       return false;
     }
 
-    // Wait a bit for the record to be available in state
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    const pendingRecords = getPendingRecords();
-    const record = pendingRecords.find(r => r.id === recordId);
+    // Retry finding the record a few times
+    let record = null;
+    let attempts = 0;
+    const maxAttempts = 5;
+    
+    while (!record && attempts < maxAttempts) {
+      const pendingRecords = getPendingRecords();
+      record = pendingRecords.find(r => r.id === recordId);
+      
+      if (!record) {
+        attempts++;
+        console.log(`Record not found, attempt ${attempts}/${maxAttempts}:`, recordId);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
     
     if (!record) {
-      // Record might already be synced or not found
-      console.log('Record not found in pending records:', recordId);
+      console.log('Record not found after retries:', recordId);
       return false;
     }
 
+    console.log('Syncing record:', recordId);
     setSyncQueue(prev => ({ ...prev, isProcessing: true }));
     const success = await syncRecord(record);
     setSyncQueue(prev => ({ 
       ...prev, 
       isProcessing: false,
       lastSyncTime: new Date(),
-      pendingCount: success ? Math.max(0, prev.pendingCount - 1) : prev.pendingCount,
     }));
 
     if (success) {
