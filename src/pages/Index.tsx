@@ -121,7 +121,7 @@ const Index = () => {
               </div>
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">
-                  Módulo de Pesagem
+                  Balança Offline
                 </h1>
                 <p className="text-muted-foreground flex items-center gap-2">
                   <Database className="w-4 h-4" />
