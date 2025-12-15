@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, Shield, ChevronDown } from 'lucide-react';
+import { LogOut, User, Shield, ChevronDown, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -27,7 +27,7 @@ const roleColors: Record<AppRole, string> = {
 };
 
 export function UserMenu() {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, canAccessAdminFeatures } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -74,6 +74,18 @@ export function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {canAccessAdminFeatures() && (
+          <>
+            <DropdownMenuItem 
+              onClick={() => navigate('/users')}
+              className="cursor-pointer"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Gerenciar Usuários
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem 
           onClick={handleLogout} 
           disabled={isLoggingOut}
