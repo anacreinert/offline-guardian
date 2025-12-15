@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Scale, Database } from 'lucide-react';
 import { StatusBanner } from '@/components/StatusBanner';
 import { WeighingForm } from '@/components/WeighingForm';
 import { RecordsList } from '@/components/RecordsList';
 import { MetricsCards } from '@/components/MetricsCards';
+import { UserMenu } from '@/components/UserMenu';
 import { useConnectionStatus } from '@/hooks/useConnectionStatus';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useSyncManager } from '@/hooks/useSyncManager';
+import { useAuth } from '@/hooks/useAuth';
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated, loading, profile } = useAuth();
+  
   const { 
     status, 
     isOffline, 
@@ -38,6 +44,13 @@ const Index = () => {
   const todayRecords = getTodayRecords();
   const offlineRecordsToday = todayRecords.filter(r => r.createdOffline).length;
 
+  // Redirect to auth if not authenticated
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      navigate('/auth');
+    }
+  }, [isAuthenticated, loading, navigate]);
+
   // Auto-sync when coming back online
   useEffect(() => {
     if (!isOffline && syncQueue.pendingCount > 0 && !syncQueue.isProcessing) {
@@ -53,6 +66,18 @@ const Index = () => {
     addRecord(data, isOffline);
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Carregando...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <StatusBanner
@@ -66,19 +91,22 @@ const Index = () => {
       <main className="container mx-auto px-4 pt-24 pb-8">
         {/* Header */}
         <div className="mb-8 animate-fade-in">
-          <div className="flex items-center gap-4 mb-2">
-            <div className="p-3 rounded-2xl bg-primary/10">
-              <Scale className="w-8 h-8 text-primary" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4 mb-2">
+              <div className="p-3 rounded-2xl bg-primary/10">
+                <Scale className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  Módulo de Pesagem
+                </h1>
+                <p className="text-muted-foreground flex items-center gap-2">
+                  <Database className="w-4 h-4" />
+                  Continuidade Operacional com Sincronização Offline
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">
-                Módulo de Pesagem
-              </h1>
-              <p className="text-muted-foreground flex items-center gap-2">
-                <Database className="w-4 h-4" />
-                Continuidade Operacional com Sincronização Offline
-              </p>
-            </div>
+            <UserMenu />
           </div>
         </div>
 
