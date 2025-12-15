@@ -18,7 +18,9 @@ const Index = () => {
   const { 
     status, 
     isOffline, 
-    setStatus 
+    setStatus,
+    isSimulatedOffline,
+    toggleSimulatedOffline,
   } = useConnectionStatus();
   
   const {
@@ -86,6 +88,8 @@ const Index = () => {
         lastSyncTime={syncQueue.lastSyncTime}
         onManualSync={syncAll}
         isSyncing={syncQueue.isProcessing}
+        isSimulatedOffline={isSimulatedOffline}
+        onToggleSimulatedOffline={toggleSimulatedOffline}
       />
 
       <main className="container mx-auto px-4 pt-24 pb-8">

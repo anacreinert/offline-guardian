@@ -4,8 +4,17 @@ import { ConnectionStatus } from '@/types/weighing';
 export function useConnectionStatus() {
   const [status, setStatus] = useState<ConnectionStatus>('online');
   const [lastOnline, setLastOnline] = useState<Date | null>(null);
+  const [isSimulatedOffline, setIsSimulatedOffline] = useState(false);
 
   const checkConnection = useCallback(async () => {
+    // If simulated offline mode is enabled, always return offline
+    if (isSimulatedOffline) {
+      if (status !== 'syncing') {
+        setStatus('offline');
+      }
+      return false;
+    }
+
     // Use browser's native online/offline detection
     if (!navigator.onLine) {
       if (status !== 'syncing') {
@@ -20,7 +29,7 @@ export function useConnectionStatus() {
       setLastOnline(new Date());
     }
     return true;
-  }, [status]);
+  }, [status, isSimulatedOffline]);
 
   useEffect(() => {
     // Initial check
@@ -28,8 +37,10 @@ export function useConnectionStatus() {
 
     // Listen for online/offline events
     const handleOnline = () => {
-      setStatus('online');
-      setLastOnline(new Date());
+      if (!isSimulatedOffline) {
+        setStatus('online');
+        setLastOnline(new Date());
+      }
     };
     
     const handleOffline = () => {
@@ -47,10 +58,24 @@ export function useConnectionStatus() {
       window.removeEventListener('offline', handleOffline);
       clearInterval(interval);
     };
-  }, [checkConnection]);
+  }, [checkConnection, isSimulatedOffline]);
+
+  // When simulated offline changes, update status immediately
+  useEffect(() => {
+    if (isSimulatedOffline) {
+      setStatus('offline');
+    } else if (navigator.onLine) {
+      setStatus('online');
+      setLastOnline(new Date());
+    }
+  }, [isSimulatedOffline]);
 
   const setManualStatus = useCallback((newStatus: ConnectionStatus) => {
     setStatus(newStatus);
+  }, []);
+
+  const toggleSimulatedOffline = useCallback(() => {
+    setIsSimulatedOffline(prev => !prev);
   }, []);
 
   return {
@@ -60,7 +85,9 @@ export function useConnectionStatus() {
     isOffline: status === 'offline',
     isSyncing: status === 'syncing',
     hasError: status === 'error',
+    isSimulatedOffline,
     checkConnection,
     setStatus: setManualStatus,
+    toggleSimulatedOffline,
   };
 }

@@ -1,4 +1,4 @@
-import { Wifi, WifiOff, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Wifi, WifiOff, RefreshCw, AlertTriangle, ToggleLeft, ToggleRight } from 'lucide-react';
 import { ConnectionStatus } from '@/types/weighing';
 import { cn } from '@/lib/utils';
 
@@ -8,6 +8,8 @@ interface StatusBannerProps {
   lastSyncTime?: Date;
   onManualSync: () => void;
   isSyncing: boolean;
+  isSimulatedOffline?: boolean;
+  onToggleSimulatedOffline?: () => void;
 }
 
 const statusConfig = {
@@ -51,6 +53,8 @@ export function StatusBanner({
   lastSyncTime, 
   onManualSync,
   isSyncing,
+  isSimulatedOffline,
+  onToggleSimulatedOffline,
 }: StatusBannerProps) {
   const config = statusConfig[status];
   const Icon = config.icon;
@@ -70,6 +74,9 @@ export function StatusBanner({
           <div className="flex flex-col">
             <span className={cn('font-semibold text-sm', config.textClass)}>
               {config.label}
+              {isSimulatedOffline && status === 'offline' && (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">(Simulado)</span>
+              )}
             </span>
             <span className="text-xs text-muted-foreground">
               {config.sublabel}
@@ -77,10 +84,34 @@ export function StatusBanner({
           </div>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
+          {/* Simulated Offline Toggle */}
+          {onToggleSimulatedOffline && (
+            <button
+              onClick={onToggleSimulatedOffline}
+              className={cn(
+                'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium',
+                'border transition-all duration-200',
+                isSimulatedOffline
+                  ? 'bg-status-offline/20 text-status-offline border-status-offline/30'
+                  : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
+              )}
+              title="Simular modo offline para testes"
+            >
+              {isSimulatedOffline ? (
+                <ToggleRight className="w-4 h-4" />
+              ) : (
+                <ToggleLeft className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">
+                {isSimulatedOffline ? 'Offline Ativo' : 'Testar Offline'}
+              </span>
+            </button>
+          )}
+
           {pendingCount > 0 && (
             <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Pendentes:</span>
+              <span className="text-muted-foreground hidden sm:inline">Pendentes:</span>
               <span className={cn(
                 'px-2 py-0.5 rounded-full font-mono font-semibold',
                 'bg-status-offline/20 text-status-offline'
@@ -91,7 +122,7 @@ export function StatusBanner({
           )}
 
           {lastSyncTime && (
-            <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="hidden lg:flex items-center gap-2 text-xs text-muted-foreground">
               <span>Última sinc.:</span>
               <span className="font-mono">
                 {lastSyncTime.toLocaleTimeString('pt-BR')}

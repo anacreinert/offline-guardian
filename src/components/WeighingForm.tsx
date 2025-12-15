@@ -148,9 +148,9 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
             type="number"
             value={formData.grossWeight}
             onChange={handleChange}
-            placeholder="0.00"
+            placeholder="0.000"
             className="font-mono text-lg"
-            step="0.01"
+            step="0.001"
             min="0"
           />
         </div>
@@ -167,9 +167,9 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
             type="number"
             value={formData.tareWeight}
             onChange={handleChange}
-            placeholder="0.00"
+            placeholder="0.000"
             className="font-mono text-lg"
-            step="0.01"
+            step="0.001"
             min="0"
           />
         </div>
@@ -183,7 +183,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground font-medium">Peso Líquido</span>
               <span className="text-3xl font-mono font-bold text-primary">
-                {netWeight.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
+                {netWeight.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
               </span>
             </div>
           </div>
