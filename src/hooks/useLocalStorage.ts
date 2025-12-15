@@ -50,19 +50,17 @@ export function useLocalStorage() {
       ...record,
       id: crypto.randomUUID(),
       timestamp: new Date(),
-      syncStatus: isOffline ? 'pending' : 'synced',
+      syncStatus: 'pending', // Always start as pending, sync will update
       syncAttempts: 0,
       createdOffline: isOffline,
     };
 
     setRecords(prev => [newRecord, ...prev]);
     
-    if (isOffline) {
-      setSyncQueue(prev => ({
-        ...prev,
-        pendingCount: prev.pendingCount + 1,
-      }));
-    }
+    setSyncQueue(prev => ({
+      ...prev,
+      pendingCount: prev.pendingCount + 1,
+    }));
 
     return newRecord;
   }, []);

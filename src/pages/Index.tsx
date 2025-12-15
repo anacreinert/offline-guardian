@@ -64,8 +64,16 @@ const Index = () => {
     }
   }, [isOffline, syncQueue.pendingCount, syncQueue.isProcessing, syncAll]);
 
-  const handleSubmit = (data: Parameters<typeof addRecord>[0]) => {
-    addRecord(data, isOffline);
+  const handleSubmit = async (data: Parameters<typeof addRecord>[0]) => {
+    const newRecord = addRecord(data, isOffline);
+    
+    // If online, immediately sync the new record
+    if (!isOffline) {
+      // Small delay to ensure record is in state
+      setTimeout(() => {
+        syncSingle(newRecord.id);
+      }, 100);
+    }
   };
 
   if (loading) {

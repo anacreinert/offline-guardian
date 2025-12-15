@@ -145,11 +145,15 @@ export function useSyncManager({
       return false;
     }
 
+    // Wait a bit for the record to be available in state
+    await new Promise(resolve => setTimeout(resolve, 50));
+
     const pendingRecords = getPendingRecords();
     const record = pendingRecords.find(r => r.id === recordId);
     
     if (!record) {
-      toast.error('Registro não encontrado');
+      // Record might already be synced or not found
+      console.log('Record not found in pending records:', recordId);
       return false;
     }
 
@@ -159,6 +163,7 @@ export function useSyncManager({
       ...prev, 
       isProcessing: false,
       lastSyncTime: new Date(),
+      pendingCount: success ? Math.max(0, prev.pendingCount - 1) : prev.pendingCount,
     }));
 
     if (success) {
