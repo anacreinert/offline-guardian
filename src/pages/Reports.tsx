@@ -43,7 +43,7 @@ interface DailySummary {
 
 const Reports = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, loading, profile, canAccessGestorFeatures } = useAuth();
+  const { isAuthenticated, loading, profile } = useAuth();
   const { toast } = useToast();
   
   const [records, setRecords] = useState<WeighingRecord[]>([]);
@@ -56,19 +56,22 @@ const Reports = () => {
     approvedRecords: 0,
   });
 
+  // Only gestor role can access this page
+  const isGestor = profile?.role === 'gestor';
+
   // Redirect if not authenticated or doesn't have permission
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       navigate('/auth');
-    } else if (!loading && isAuthenticated && !canAccessGestorFeatures()) {
+    } else if (!loading && isAuthenticated && !isGestor) {
       navigate('/');
       toast({
         title: 'Acesso negado',
-        description: 'Você não tem permissão para acessar esta página.',
+        description: 'Apenas gestores podem acessar esta página.',
         variant: 'destructive',
       });
     }
-  }, [isAuthenticated, loading, navigate, canAccessGestorFeatures, toast]);
+  }, [isAuthenticated, loading, navigate, isGestor, toast]);
 
   // Fetch all records
   const fetchRecords = async () => {
@@ -116,10 +119,10 @@ const Reports = () => {
   };
 
   useEffect(() => {
-    if (isAuthenticated && canAccessGestorFeatures()) {
+    if (isAuthenticated && isGestor) {
       fetchRecords();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isGestor]);
 
   const handleApprove = async (recordId: string) => {
     try {
@@ -195,7 +198,7 @@ const Reports = () => {
     );
   }
 
-  if (!isAuthenticated || !canAccessGestorFeatures()) {
+  if (!isAuthenticated || !isGestor) {
     return null;
   }
 
