@@ -72,68 +72,106 @@ export function useSyncManager({
 
   const syncToDatabase = async (record: WeighingRecord): Promise<{ success: boolean; error?: string }> => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      console.log('[SYNC] Iniciando sincronização do registro:', record.id);
+      
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        console.error('[SYNC] Erro de autenticação:', authError);
+        return { success: false, error: `Erro de autenticação: ${authError.message}` };
+      }
       
       if (!user) {
-        console.error('User not authenticated');
-        return { success: false, error: 'Usuário não autenticado' };
+        console.error('[SYNC] Usuário não autenticado');
+        return { success: false, error: 'Usuário não autenticado. Faça login novamente.' };
       }
 
-      // Upload photos first
-      const photoUrls = await uploadPhotos(record, user.id);
+      console.log('[SYNC] Usuário autenticado:', user.id, user.email);
 
-      const { error } = await supabase
+      // Upload photos first
+      let photoUrls: Record<string, string> = {};
+      try {
+        photoUrls = await uploadPhotos(record, user.id);
+        console.log('[SYNC] Fotos enviadas:', Object.keys(photoUrls).length);
+      } catch (photoErr: any) {
+        console.warn('[SYNC] Erro ao enviar fotos (continuando sem fotos):', photoErr);
+        // Continue without photos - don't fail the entire sync
+      }
+
+      const insertData = {
+        id: record.id,
+        user_id: user.id,
+        // Identification
+        ticket_number: record.ticketNumber || null,
+        vehicle_plate: record.vehiclePlate,
+        vehicle_type: record.vehicleType || null,
+        driver_name: record.driverName || null,
+        supplier: record.supplier || null,
+        origin: record.origin || null,
+        // Product
+        product: record.product || null,
+        harvest: record.harvest || null,
+        destination: record.destination || null,
+        // Weighing
+        gross_weight: record.grossWeight,
+        tare_weight: record.tareWeight,
+        net_weight: record.netWeight,
+        scale_number: record.scaleNumber || null,
+        entry_time: record.entryTime?.toISOString() || null,
+        exit_time: record.exitTime?.toISOString() || null,
+        // Set status based on whether it was created offline
+        status: record.createdOffline ? 'pending_approval' : (record.status || 'completed'),
+        // Weight method
+        weight_method: record.weightMethod || 'scale',
+        is_estimated: record.isEstimated || false,
+        estimated_reason: record.estimatedReason || null,
+        // Additional
+        notes: record.notes || null,
+        created_offline: record.createdOffline,
+        synced_at: new Date().toISOString(),
+        created_at: record.timestamp.toISOString(),
+        photo_urls: photoUrls,
+      };
+
+      console.log('[SYNC] Dados para inserção:', JSON.stringify(insertData, null, 2));
+
+      const { data, error } = await supabase
         .from('weighing_records')
-        .insert({
-          id: record.id,
-          user_id: user.id,
-          // Identification
-          ticket_number: record.ticketNumber || null,
-          vehicle_plate: record.vehiclePlate,
-          vehicle_type: record.vehicleType || null,
-          driver_name: record.driverName || null,
-          supplier: record.supplier || null,
-          origin: record.origin || null,
-          // Product
-          product: record.product || null,
-          harvest: record.harvest || null,
-          destination: record.destination || null,
-          // Weighing
-          gross_weight: record.grossWeight,
-          tare_weight: record.tareWeight,
-          net_weight: record.netWeight,
-          scale_number: record.scaleNumber || null,
-          entry_time: record.entryTime?.toISOString() || null,
-          exit_time: record.exitTime?.toISOString() || null,
-          // Set status based on whether it was created offline
-          status: record.createdOffline ? 'pending_approval' : (record.status || 'completed'),
-          // Weight method
-          weight_method: record.weightMethod || 'scale',
-          is_estimated: record.isEstimated || false,
-          estimated_reason: record.estimatedReason || null,
-          // Additional
-          notes: record.notes || null,
-          created_offline: record.createdOffline,
-          synced_at: new Date().toISOString(),
-          created_at: record.timestamp.toISOString(),
-          photo_urls: photoUrls,
-        } as any);
+        .insert(insertData as any)
+        .select();
 
       if (error) {
         // If record already exists, consider it synced
         if (error.code === '23505') {
-          console.log('Record already exists in database:', record.id);
+          console.log('[SYNC] Registro já existe no banco:', record.id);
           return { success: true };
         }
-        console.error('Error syncing record:', error);
-        return { success: false, error: error.message || `Erro: ${error.code}` };
+        
+        console.error('[SYNC] Erro ao inserir registro:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
+        
+        // Provide user-friendly error messages
+        let userMessage = error.message;
+        if (error.code === '42501') {
+          userMessage = 'Permissão negada. Verifique se você está logado corretamente.';
+        } else if (error.code === '23503') {
+          userMessage = 'Erro de referência: dados relacionados não encontrados.';
+        } else if (error.code === 'PGRST301') {
+          userMessage = 'Erro de conexão com o banco de dados.';
+        }
+        
+        return { success: false, error: `${userMessage} (${error.code})` };
       }
 
-      console.log('Record synced successfully:', record.id);
+      console.log('[SYNC] Registro sincronizado com sucesso:', record.id, data);
       return { success: true };
     } catch (err: any) {
-      console.error('Error syncing record:', err);
-      return { success: false, error: err?.message || 'Erro desconhecido' };
+      console.error('[SYNC] Erro inesperado:', err);
+      return { success: false, error: err?.message || 'Erro desconhecido durante sincronização' };
     }
   };
 
