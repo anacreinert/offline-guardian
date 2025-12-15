@@ -93,6 +93,7 @@ export interface WeighingRecord {
   photos?: PhotoData[];
   photoUrls?: PhotoUrls;
   syncStatus: SyncStatus;
+  syncError?: string;
   syncAttempts: number;
   lastSyncAttempt?: Date;
   createdOffline: boolean;

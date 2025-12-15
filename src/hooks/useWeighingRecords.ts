@@ -214,13 +214,14 @@ export function useWeighingRecords() {
   }, [saveLocalRecords]);
 
   // Update record sync status
-  const updateRecordSyncStatus = useCallback((id: string, syncStatus: WeighingRecord['syncStatus']) => {
+  const updateRecordSyncStatus = useCallback((id: string, syncStatus: WeighingRecord['syncStatus'], syncError?: string) => {
     setRecords(prev => {
       const updated = prev.map(record =>
         record.id === id
           ? {
               ...record,
               syncStatus,
+              syncError: syncStatus === 'error' ? syncError : undefined,
               syncAttempts: record.syncAttempts + 1,
               lastSyncAttempt: new Date(),
             }
