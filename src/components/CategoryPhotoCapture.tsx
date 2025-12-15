@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Camera, X, Loader2, ScanLine } from 'lucide-react';
+import { Camera, X, Loader2, ScanLine, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { useCamera } from '@/hooks/useCamera';
-import { useOCR } from '@/hooks/useOCR';
+import { useHybridOCR } from '@/hooks/useHybridOCR';
 import { PhotoData, PhotoCategory } from '@/types/weighing';
 import { toast } from 'sonner';
 import { OCRConfirmationDialog } from '@/components/OCRConfirmationDialog';
@@ -40,10 +41,11 @@ export function CategoryPhotoCapture({
   disabled = false 
 }: CategoryPhotoCaptureProps) {
   const { isCapturing, error, takePhoto } = useCamera();
-  const { isProcessing, recognizePlate, recognizeBothWeights, recognizeProduct } = useOCR();
+  const { isProcessing, progress, lastSource, isOnline, recognizePlate, recognizeBothWeights, recognizeProduct } = useHybridOCR();
   
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingOCR, setPendingOCR] = useState<OCRResult | null>(null);
+  const [ocrSource, setOcrSource] = useState<'online' | 'offline' | null>(null);
 
   const handleTakePhoto = async () => {
     const captured = await takePhoto();
@@ -59,9 +61,11 @@ export function CategoryPhotoCapture({
 
       // If this is a vehicle plate photo, run OCR
       if (category === 'vehiclePlate' && onPlateRecognized) {
-        toast.info('Processando OCR da placa...');
+        const modeText = isOnline ? 'online (IA)' : 'offline (local)';
+        toast.info(`Processando OCR da placa... (modo ${modeText})`);
         const result = await recognizePlate(captured.dataUrl);
         
+        setOcrSource(result?.source || null);
         // Show confirmation dialog instead of auto-filling
         setPendingOCR({
           type: 'plate',
@@ -73,9 +77,11 @@ export function CategoryPhotoCapture({
 
       // If this is a tare weight photo, run OCR for both weights
       if (category === 'tare' && onBothWeightsRecognized) {
-        toast.info('Processando OCR dos pesos (Tara e PBT)...');
+        const modeText = isOnline ? 'online (IA)' : 'offline (local)';
+        toast.info(`Processando OCR dos pesos... (modo ${modeText})`);
         const result = await recognizeBothWeights(captured.dataUrl);
         
+        setOcrSource(result?.source || null);
         // Show confirmation dialog instead of auto-filling
         setPendingOCR({
           type: 'weights',
@@ -88,9 +94,11 @@ export function CategoryPhotoCapture({
 
       // If this is a product photo, run OCR for product recognition
       if (category === 'product' && onProductRecognized) {
-        toast.info('Identificando produto na carga...');
+        const modeText = isOnline ? 'online (IA)' : 'offline (local)';
+        toast.info(`Identificando produto... (modo ${modeText})`);
         const result = await recognizeProduct(captured.dataUrl);
         
+        setOcrSource(result?.source || null);
         // Show confirmation dialog instead of auto-filling
         setPendingOCR({
           type: 'product',
@@ -154,8 +162,11 @@ export function CategoryPhotoCapture({
               className="w-full h-full object-cover"
             />
             {isProcessing && (
-              <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                <ScanLine className="h-5 w-5 text-primary animate-pulse" />
+              <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center gap-1">
+                <ScanLine className="h-4 w-4 text-primary animate-pulse" />
+                {!isOnline && progress > 0 && (
+                  <span className="text-[8px] text-muted-foreground">{progress}%</span>
+                )}
               </div>
             )}
             <button
@@ -166,6 +177,19 @@ export function CategoryPhotoCapture({
             >
               <X className="h-3 w-3" />
             </button>
+            {/* OCR source indicator */}
+            {ocrSource && !isProcessing && (
+              <div 
+                className="absolute -bottom-1 -left-1 p-0.5 rounded-full"
+                title={ocrSource === 'online' ? 'OCR Online (IA)' : 'OCR Offline (local)'}
+              >
+                {ocrSource === 'online' ? (
+                  <Wifi className="h-3 w-3 text-green-500" />
+                ) : (
+                  <WifiOff className="h-3 w-3 text-orange-500" />
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <Button
@@ -174,17 +198,25 @@ export function CategoryPhotoCapture({
             size="icon"
             onClick={handleTakePhoto}
             disabled={disabled || isLoading}
-            className="h-10 w-10 flex-shrink-0"
-            title={`Tirar foto de ${label}`}
+            className="h-10 w-10 flex-shrink-0 relative"
+            title={`Tirar foto de ${label}${!isOnline ? ' (modo offline)' : ''}`}
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Camera className="h-4 w-4" />
             )}
+            {!isOnline && (
+              <WifiOff className="absolute -top-1 -right-1 h-3 w-3 text-orange-500" />
+            )}
           </Button>
         )}
       </div>
+
+      {/* Progress bar for offline OCR */}
+      {isProcessing && !isOnline && progress > 0 && (
+        <Progress value={progress} className="h-1 mt-1" />
+      )}
 
       {pendingOCR && (
         <OCRConfirmationDialog
