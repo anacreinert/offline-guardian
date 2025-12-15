@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { WeighingRecord, SyncQueue } from '@/types/weighing';
 
 const STORAGE_KEY = 'weighing_records';
-const SYNC_QUEUE_KEY = 'sync_queue';
 
 export function useLocalStorage() {
   const [records, setRecords] = useState<WeighingRecord[]>([]);
@@ -10,6 +9,13 @@ export function useLocalStorage() {
     pendingCount: 0,
     isProcessing: false,
   });
+  const [isLoaded, setIsLoaded] = useState(false);
+  const recordsRef = useRef<WeighingRecord[]>([]);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    recordsRef.current = records;
+  }, [records]);
 
   // Load records from localStorage on mount
   useEffect(() => {
@@ -18,44 +24,62 @@ export function useLocalStorage() {
       if (stored) {
         const parsed = JSON.parse(stored);
         // Convert date strings back to Date objects
-        const records = parsed.map((r: WeighingRecord) => ({
+        const loadedRecords = parsed.map((r: WeighingRecord) => ({
           ...r,
           timestamp: new Date(r.timestamp),
           lastSyncAttempt: r.lastSyncAttempt ? new Date(r.lastSyncAttempt) : undefined,
         }));
-        setRecords(records);
+        setRecords(loadedRecords);
+        recordsRef.current = loadedRecords;
         
         // Update sync queue count
-        const pendingCount = records.filter(
+        const pendingCount = loadedRecords.filter(
           (r: WeighingRecord) => r.syncStatus === 'pending' || r.syncStatus === 'error'
         ).length;
         setSyncQueue(prev => ({ ...prev, pendingCount }));
       }
     } catch (error) {
       console.error('Error loading records from localStorage:', error);
+    } finally {
+      setIsLoaded(true);
     }
   }, []);
 
-  // Save records to localStorage whenever they change
+  // Save records to localStorage whenever they change (only after initial load)
   useEffect(() => {
+    if (!isLoaded) return;
+    
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+      console.log('Records saved to localStorage:', records.length);
     } catch (error) {
       console.error('Error saving records to localStorage:', error);
     }
-  }, [records]);
+  }, [records, isLoaded]);
 
   const addRecord = useCallback((record: Omit<WeighingRecord, 'id' | 'timestamp' | 'syncStatus' | 'syncAttempts' | 'createdOffline'>, isOffline: boolean) => {
     const newRecord: WeighingRecord = {
       ...record,
       id: crypto.randomUUID(),
       timestamp: new Date(),
-      syncStatus: 'pending', // Always start as pending, sync will update
+      syncStatus: 'pending',
       syncAttempts: 0,
       createdOffline: isOffline,
     };
 
-    setRecords(prev => [newRecord, ...prev]);
+    setRecords(prev => {
+      const updated = [newRecord, ...prev];
+      // Immediately update ref for sync access
+      recordsRef.current = updated;
+      // Force immediate save to localStorage
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        console.log('Record added and saved immediately:', newRecord.id);
+      } catch (error) {
+        console.error('Error saving new record:', error);
+      }
+      return updated;
+    });
     
     setSyncQueue(prev => ({
       ...prev,
@@ -66,8 +90,8 @@ export function useLocalStorage() {
   }, []);
 
   const updateRecordSyncStatus = useCallback((id: string, syncStatus: WeighingRecord['syncStatus']) => {
-    setRecords(prev => 
-      prev.map(record => 
+    setRecords(prev => {
+      const updated = prev.map(record => 
         record.id === id 
           ? { 
               ...record, 
@@ -76,21 +100,30 @@ export function useLocalStorage() {
               lastSyncAttempt: new Date(),
             } 
           : record
-      )
-    );
-
-    // Update pending count
-    setSyncQueue(prev => {
-      const newCount = syncStatus === 'synced' || syncStatus === 'syncing'
-        ? Math.max(0, prev.pendingCount - 1)
-        : prev.pendingCount;
-      return { ...prev, pendingCount: newCount };
+      );
+      recordsRef.current = updated;
+      // Force immediate save
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch (error) {
+        console.error('Error saving record status update:', error);
+      }
+      return updated;
     });
+
+    // Update pending count only when synced successfully
+    if (syncStatus === 'synced') {
+      setSyncQueue(prev => ({
+        ...prev,
+        pendingCount: Math.max(0, prev.pendingCount - 1),
+      }));
+    }
   }, []);
 
   const getPendingRecords = useCallback(() => {
-    return records.filter(r => r.syncStatus === 'pending' || r.syncStatus === 'error');
-  }, [records]);
+    // Use ref for immediate access
+    return recordsRef.current.filter(r => r.syncStatus === 'pending' || r.syncStatus === 'error');
+  }, []);
 
   const getTodayRecords = useCallback(() => {
     const today = new Date();
@@ -118,5 +151,6 @@ export function useLocalStorage() {
     getTodayRecords,
     clearSyncedRecords,
     setSyncQueue,
+    isLoaded,
   };
 }
