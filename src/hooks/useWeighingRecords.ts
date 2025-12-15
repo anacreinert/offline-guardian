@@ -126,7 +126,14 @@ export function useWeighingRecords() {
     const pendingCount = merged.filter(
       r => r.syncStatus === 'pending' || r.syncStatus === 'error'
     ).length;
-    setSyncQueue(prev => ({ ...prev, pendingCount }));
+
+    // Find the most recent synced record timestamp for lastSyncTime
+    const syncedRecords = merged.filter(r => r.syncStatus === 'synced');
+    const lastSyncTime = syncedRecords.length > 0 
+      ? new Date(Math.max(...syncedRecords.map(r => new Date(r.timestamp).getTime())))
+      : undefined;
+
+    setSyncQueue(prev => ({ ...prev, pendingCount, lastSyncTime }));
 
     setIsLoaded(true);
   }, [loadLocalRecords, fetchDatabaseRecords, mergeRecords]);
