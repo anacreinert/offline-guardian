@@ -11,9 +11,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { WeighingRecord } from '@/types/weighing';
+import { WeighingRecord, PhotoData } from '@/types/weighing';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { CameraCapture } from '@/components/CameraCapture';
+import { CapturedPhoto } from '@/hooks/useCamera';
 
 // Santa Catarina cities
 const SC_CITIES = [
@@ -76,6 +78,7 @@ interface WeighingFormProps {
 }
 
 export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
+  const [photos, setPhotos] = useState<CapturedPhoto[]>([]);
   const [formData, setFormData] = useState({
     vehiclePlate: '',
     driverName: '',
@@ -140,6 +143,12 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
       return;
     }
 
+    const photoData: PhotoData[] = photos.map(p => ({
+      dataUrl: p.dataUrl,
+      format: p.format,
+      timestamp: p.timestamp,
+    }));
+
     onSubmit({
       vehiclePlate: formData.vehiclePlate.toUpperCase(),
       driverName: formData.driverName,
@@ -150,6 +159,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
       origin: formData.origin,
       destination: formData.destination,
       notes: formData.notes,
+      photos: photoData.length > 0 ? photoData : undefined,
     });
 
     // Reset form
@@ -163,6 +173,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
       destination: '',
       notes: '',
     });
+    setPhotos([]);
 
     toast.success(
       isOffline 
@@ -364,6 +375,15 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
             onChange={handleChange}
             placeholder="Informações adicionais..."
             rows={3}
+          />
+        </div>
+
+        {/* Camera Capture */}
+        <div className="space-y-2 md:col-span-2">
+          <CameraCapture
+            photos={photos}
+            onPhotosChange={setPhotos}
+            maxPhotos={3}
           />
         </div>
       </div>

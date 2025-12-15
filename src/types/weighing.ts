@@ -2,6 +2,12 @@ export type ConnectionStatus = 'online' | 'offline' | 'syncing' | 'error';
 
 export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'error';
 
+export interface PhotoData {
+  dataUrl: string;
+  format: string;
+  timestamp: Date;
+}
+
 export interface WeighingRecord {
   id: string;
   timestamp: Date;
@@ -14,6 +20,7 @@ export interface WeighingRecord {
   origin: string;
   destination: string;
   notes?: string;
+  photos?: PhotoData[];
   syncStatus: SyncStatus;
   syncAttempts: number;
   lastSyncAttempt?: Date;
