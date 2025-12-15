@@ -99,10 +99,11 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
             name="vehiclePlate"
             value={formData.vehiclePlate}
             onChange={handleChange}
-            placeholder="ABC-1234"
+            placeholder="ABC1D23 ou ABC-1234"
             className="uppercase font-mono text-lg"
             maxLength={8}
           />
+          <p className="text-xs text-muted-foreground">Formato Mercosul (ABC1D23) ou antigo (ABC-1234)</p>
         </div>
 
         {/* Driver Name */}
