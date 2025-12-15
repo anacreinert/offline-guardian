@@ -38,8 +38,8 @@ export function DailyReportSummary({ summary, isLoading }: DailyReportSummaryPro
       value: summary.pendingApproval,
       suffix: '',
       icon: Clock,
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
+      color: 'text-status-syncing',
+      bgColor: 'bg-status-syncing/10',
     },
     {
       title: 'Aprovadas',
@@ -54,8 +54,8 @@ export function DailyReportSummary({ summary, isLoading }: DailyReportSummaryPro
       value: summary.rejectedRecords,
       suffix: '',
       icon: XCircle,
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
+      color: 'text-destructive',
+      bgColor: 'bg-destructive/10',
     },
   ];
 
