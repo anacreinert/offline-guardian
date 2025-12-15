@@ -27,6 +27,7 @@ interface CategoryPhotoCaptureProps {
   onProductRecognized?: (product: string) => void;
   label: string;
   disabled?: boolean;
+  isOnline: boolean;
 }
 
 export function CategoryPhotoCapture({ 
@@ -38,10 +39,11 @@ export function CategoryPhotoCapture({
   onBothWeightsRecognized,
   onProductRecognized,
   label,
-  disabled = false 
+  disabled = false,
+  isOnline
 }: CategoryPhotoCaptureProps) {
   const { isCapturing, error, takePhoto } = useCamera();
-  const { isProcessing, progress, lastSource, isOnline, recognizePlate, recognizeBothWeights, recognizeProduct } = useHybridOCR();
+  const { isProcessing, progress, lastSource, recognizePlate, recognizeBothWeights, recognizeProduct } = useHybridOCR({ isOnline });
   
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingOCR, setPendingOCR] = useState<OCRResult | null>(null);

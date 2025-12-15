@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useOCR } from './useOCR';
 import { useOfflineOCR } from './useOfflineOCR';
-import { useConnectionStatus } from './useConnectionStatus';
 
 interface PlateOCRResult {
   plate: string | null;
@@ -32,10 +31,13 @@ interface ProductOCRResult {
   source: 'online' | 'offline';
 }
 
-export function useHybridOCR() {
+interface UseHybridOCROptions {
+  isOnline: boolean;
+}
+
+export function useHybridOCR({ isOnline }: UseHybridOCROptions) {
   const onlineOCR = useOCR();
   const offlineOCR = useOfflineOCR();
-  const { isOnline } = useConnectionStatus();
   const [lastSource, setLastSource] = useState<'online' | 'offline' | null>(null);
 
   const isProcessing = onlineOCR.isProcessing || offlineOCR.isProcessing;
@@ -56,7 +58,8 @@ export function useHybridOCR() {
       }
     }
 
-    // Fall back to offline
+    // Fall back to offline (Tesseract.js - no network required)
+    console.log('Using offline OCR (Tesseract.js)...');
     const result = await offlineOCR.recognizePlate(imageDataUrl);
     if (result) {
       setLastSource('offline');
@@ -78,7 +81,8 @@ export function useHybridOCR() {
       }
     }
 
-    // Fall back to offline
+    // Fall back to offline (Tesseract.js - no network required)
+    console.log('Using offline OCR (Tesseract.js)...');
     const result = await offlineOCR.recognizeWeight(imageDataUrl);
     if (result) {
       setLastSource('offline');
@@ -100,7 +104,8 @@ export function useHybridOCR() {
       }
     }
 
-    // Fall back to offline
+    // Fall back to offline (Tesseract.js - no network required)
+    console.log('Using offline OCR (Tesseract.js)...');
     const result = await offlineOCR.recognizeBothWeights(imageDataUrl);
     if (result) {
       setLastSource('offline');
@@ -122,7 +127,8 @@ export function useHybridOCR() {
       }
     }
 
-    // Fall back to offline
+    // Fall back to offline (Tesseract.js - no network required)
+    console.log('Using offline OCR (Tesseract.js)...');
     const result = await offlineOCR.recognizeProduct(imageDataUrl);
     if (result) {
       setLastSource('offline');
