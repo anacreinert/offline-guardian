@@ -103,9 +103,8 @@ export function useSyncManager({
           tare_weight: record.tareWeight,
           net_weight: record.netWeight,
           scale_number: record.scaleNumber || null,
-          entry_time: record.entryTime?.toISOString() || null,
-          exit_time: record.exitTime?.toISOString() || null,
-          status: record.status || 'completed',
+          // Set status based on whether it was created offline
+          status: record.createdOffline ? 'pending_approval' : (record.status || 'completed'),
           // Weight method
           weight_method: record.weightMethod || 'scale',
           is_estimated: record.isEstimated || false,
@@ -165,16 +164,11 @@ export function useSyncManager({
 
     const pendingRecords = getPendingRecords();
     
-    // Filter out offline records - they require manager approval before syncing
-    const recordsToSync = pendingRecords.filter(r => !r.createdOffline);
+    // Sync all pending records (including offline - they go with pending_approval status)
+    const recordsToSync = pendingRecords;
     
     if (recordsToSync.length === 0) {
-      const offlineCount = pendingRecords.filter(r => r.createdOffline).length;
-      if (offlineCount > 0) {
-        toast.info(`${offlineCount} registro(s) offline aguardando aprovação do gestor`);
-      } else {
-        toast.info('Nenhum registro pendente para sincronizar');
-      }
+      toast.info('Nenhum registro pendente para sincronizar');
       return;
     }
 
@@ -240,10 +234,9 @@ export function useSyncManager({
       return false;
     }
 
-    // Block sync for offline records - they require manager approval
+    // Offline records will be synced with pending_approval status
     if (record.createdOffline) {
-      toast.info('Registros offline precisam de aprovação do gestor antes de sincronizar');
-      return false;
+      console.log('Syncing offline record (will require manager approval):', recordId);
     }
 
     console.log('Syncing record:', recordId);
