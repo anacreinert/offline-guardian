@@ -1,9 +1,20 @@
-import { CheckCircle, Clock, Truck, Package, MapPin } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle, Clock, Truck, Package, MapPin, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 interface WeighingRecord {
   id: string;
@@ -20,6 +31,9 @@ interface WeighingRecord {
   synced_at: string | null;
   approved_at: string | null;
   approved_by: string | null;
+  rejected_at?: string | null;
+  rejected_by?: string | null;
+  rejection_reason?: string | null;
   created_at: string;
   user_id: string;
 }
@@ -27,11 +41,33 @@ interface WeighingRecord {
 interface ApprovalListProps {
   records: WeighingRecord[];
   onApprove: (id: string) => void;
+  onReject: (id: string, reason: string) => void;
   onApproveAll: () => void;
   isLoading: boolean;
 }
 
-export function ApprovalList({ records, onApprove, onApproveAll, isLoading }: ApprovalListProps) {
+export function ApprovalList({ records, onApprove, onReject, onApproveAll, isLoading }: ApprovalListProps) {
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [isRejecting, setIsRejecting] = useState(false);
+
+  const handleOpenRejectDialog = (recordId: string) => {
+    setSelectedRecordId(recordId);
+    setRejectionReason('');
+    setRejectDialogOpen(true);
+  };
+
+  const handleConfirmReject = async () => {
+    if (!selectedRecordId) return;
+    
+    setIsRejecting(true);
+    await onReject(selectedRecordId, rejectionReason);
+    setIsRejecting(false);
+    setRejectDialogOpen(false);
+    setSelectedRecordId(null);
+    setRejectionReason('');
+  };
   if (isLoading) {
     return (
       <Card>
@@ -126,14 +162,25 @@ export function ApprovalList({ records, onApprove, onApproveAll, isLoading }: Ap
                         Peso Líquido
                       </div>
                     </div>
-                    <Button 
-                      size="sm" 
-                      onClick={() => onApprove(record.id)}
-                      className="gap-1.5"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                      Aprovar
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleOpenRejectDialog(record.id)}
+                        className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Rejeitar
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        onClick={() => onApprove(record.id)}
+                        className="gap-1.5"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        Aprovar
+                      </Button>
+                    </div>
                   </div>
                 </div>
                 
@@ -147,6 +194,42 @@ export function ApprovalList({ records, onApprove, onApproveAll, isLoading }: Ap
           </div>
         )}
       </CardContent>
+
+      {/* Reject Dialog */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rejeitar Pesagem</DialogTitle>
+            <DialogDescription>
+              Informe o motivo da rejeição desta pesagem offline.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rejection-reason">Motivo da Rejeição</Label>
+              <Textarea
+                id="rejection-reason"
+                placeholder="Descreva o motivo da rejeição..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleConfirmReject}
+              disabled={isRejecting}
+            >
+              {isRejecting ? 'Rejeitando...' : 'Confirmar Rejeição'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

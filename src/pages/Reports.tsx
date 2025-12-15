@@ -29,6 +29,9 @@ interface WeighingRecord {
   synced_at: string | null;
   approved_at: string | null;
   approved_by: string | null;
+  rejected_at: string | null;
+  rejected_by: string | null;
+  rejection_reason: string | null;
   created_at: string;
   user_id: string;
 }
@@ -157,6 +160,35 @@ const Reports = () => {
     }
   };
 
+  const handleReject = async (recordId: string, reason: string) => {
+    try {
+      const { error } = await supabase
+        .from('weighing_records')
+        .update({
+          rejected_at: new Date().toISOString(),
+          rejected_by: profile?.user_id,
+          rejection_reason: reason || null,
+        })
+        .eq('id', recordId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Pesagem rejeitada',
+        description: 'O registro foi rejeitado.',
+      });
+
+      fetchRecords();
+    } catch (error) {
+      console.error('Error rejecting record:', error);
+      toast({
+        title: 'Erro ao rejeitar',
+        description: 'Não foi possível rejeitar o registro.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleApproveAll = async () => {
     try {
       const pendingRecords = records.filter(r => r.created_offline && !r.approved_at);
@@ -208,7 +240,8 @@ const Reports = () => {
   }
 
   const offlineRecords = records.filter(r => r.created_offline);
-  const pendingApprovalRecords = offlineRecords.filter(r => !r.approved_at);
+  const pendingApprovalRecords = offlineRecords.filter(r => !r.approved_at && !r.rejected_at);
+  const rejectedRecords = offlineRecords.filter(r => r.rejected_at);
 
   return (
     <div className="min-h-screen bg-background">
@@ -255,6 +288,7 @@ const Reports = () => {
             <ApprovalList 
               records={pendingApprovalRecords} 
               onApprove={handleApprove}
+              onReject={handleReject}
               onApproveAll={handleApproveAll}
               isLoading={isLoading}
             />
