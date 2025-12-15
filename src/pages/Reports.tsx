@@ -57,13 +57,18 @@ const Reports = () => {
   });
 
   // Only gestor role can access this page
+  const isProfileReady = !!profile;
   const isGestor = profile?.role === 'gestor';
 
   // Redirect if not authenticated or doesn't have permission
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       navigate('/auth');
-    } else if (!loading && isAuthenticated && !isGestor) {
+      return;
+    }
+
+    // Wait for profile to load before applying role-based redirects
+    if (!loading && isAuthenticated && isProfileReady && !isGestor) {
       navigate('/');
       toast({
         title: 'Acesso negado',
@@ -71,7 +76,7 @@ const Reports = () => {
         variant: 'destructive',
       });
     }
-  }, [isAuthenticated, loading, navigate, isGestor, toast]);
+  }, [isAuthenticated, loading, navigate, isGestor, isProfileReady, toast]);
 
   // Fetch all records
   const fetchRecords = async () => {
@@ -190,7 +195,7 @@ const Reports = () => {
     }
   };
 
-  if (loading) {
+  if (loading || (isAuthenticated && !profile)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Carregando...</div>
