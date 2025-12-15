@@ -13,10 +13,11 @@ interface OCRConfirmationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   imageUrl: string;
-  type: 'plate' | 'weights';
+  type: 'plate' | 'weights' | 'product';
   plateValue?: string | null;
   tareValue?: number | null;
   grossValue?: number | null;
+  productValue?: string | null;
   onConfirm: () => void;
   onReject: () => void;
 }
@@ -29,11 +30,14 @@ export function OCRConfirmationDialog({
   plateValue,
   tareValue,
   grossValue,
+  productValue,
   onConfirm,
   onReject,
 }: OCRConfirmationDialogProps) {
   const hasValidData = type === 'plate' 
     ? !!plateValue 
+    : type === 'product'
+    ? !!productValue
     : (tareValue !== null || grossValue !== null);
 
   const handleConfirm = () => {
@@ -112,6 +116,13 @@ export function OCRConfirmationDialog({
                     </div>
                   )}
                 </>
+              )}
+
+              {type === 'product' && productValue && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Produto:</span>
+                  <span className="font-mono text-lg font-bold text-primary">{productValue}</span>
+                </div>
               )}
             </div>
           )}

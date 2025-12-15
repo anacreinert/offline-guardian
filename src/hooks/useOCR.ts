@@ -20,6 +20,12 @@ interface BothWeightsOCRResult {
   success: boolean;
 }
 
+interface ProductOCRResult {
+  product: string | null;
+  raw: string;
+  success: boolean;
+}
+
 export function useOCR() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -130,11 +136,47 @@ export function useOCR() {
     }
   };
 
+  const recognizeProduct = async (imageDataUrl: string): Promise<ProductOCRResult | null> => {
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('ocr-product', {
+        body: { imageBase64: imageDataUrl },
+      });
+
+      if (fnError) {
+        console.error('OCR product function error:', fnError);
+        setError(fnError.message);
+        return null;
+      }
+
+      if (data.error) {
+        setError(data.error);
+        return null;
+      }
+
+      return {
+        product: data.product,
+        raw: data.raw,
+        success: data.success,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Product OCR failed';
+      setError(message);
+      console.error('Product OCR error:', err);
+      return null;
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return {
     isProcessing,
     error,
     recognizePlate,
     recognizeWeight,
     recognizeBothWeights,
+    recognizeProduct,
   };
 }

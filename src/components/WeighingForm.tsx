@@ -121,6 +121,10 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
     }));
   };
 
+  const handleProductRecognized = (product: string) => {
+    setFormData(prev => ({ ...prev, product }));
+  };
+
   const formatWeight = (value: string): string => {
     // Remove non-numeric characters except decimal point
     const cleanValue = value.replace(/[^\d.]/g, '');
@@ -295,6 +299,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
               category="product"
               photo={productPhoto}
               onPhotoChange={setProductPhoto}
+              onProductRecognized={handleProductRecognized}
               label="produto"
             />
           </div>
