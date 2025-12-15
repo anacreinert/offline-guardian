@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Scale, Truck, User, Package, MapPin, FileText, Save, ArrowRight } from 'lucide-react';
+import { Scale, Truck, User, Package, MapPin, FileText, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -125,20 +125,6 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
 
   const handleScaleWeightRecognized = (weight: number) => {
     setFormData(prev => ({ ...prev, scaleWeight: weight.toFixed(3) }));
-  };
-
-  const useScaleAsGross = () => {
-    if (formData.scaleWeight) {
-      setFormData(prev => ({ ...prev, grossWeight: prev.scaleWeight }));
-      toast.success('Peso da balança aplicado como Peso Bruto');
-    }
-  };
-
-  const useScaleAsTare = () => {
-    if (formData.scaleWeight) {
-      setFormData(prev => ({ ...prev, tareWeight: prev.scaleWeight }));
-      toast.success('Peso da balança aplicado como Tara');
-    }
   };
 
   const handleProductRecognized = (product: string) => {
@@ -329,7 +315,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
         </div>
 
         {/* Scale Weight */}
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2">
           <Label htmlFor="scaleWeight" className="flex items-center gap-2">
             <Scale className="w-4 h-4 text-muted-foreground" />
             Peso da Balança (kg)
@@ -354,30 +340,6 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
               label="balança"
             />
           </div>
-          {formData.scaleWeight && (
-            <div className="flex gap-2 mt-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
-                onClick={useScaleAsGross}
-                className="flex-1 gap-1"
-              >
-                <ArrowRight className="w-3 h-3" />
-                Usar como Peso Bruto
-              </Button>
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
-                onClick={useScaleAsTare}
-                className="flex-1 gap-1"
-              >
-                <ArrowRight className="w-3 h-3" />
-                Usar como Tara
-              </Button>
-            </div>
-          )}
         </div>
 
         {/* Gross Weight */}
