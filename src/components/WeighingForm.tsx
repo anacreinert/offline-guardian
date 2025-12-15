@@ -373,6 +373,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
                 onPhotoChange={setVehiclePlatePhoto}
                 onPlateRecognized={handlePlateRecognized}
                 label="placa"
+                isOnline={!isOffline}
               />
             </div>
           </div>
@@ -492,6 +493,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
                 onPhotoChange={setProductPhoto}
                 onProductRecognized={handleProductRecognized}
                 label="produto"
+                isOnline={!isOffline}
               />
             </div>
           </div>
@@ -664,6 +666,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
                   onPhotoChange={setGrossDisplayPhoto}
                   onWeightRecognized={handleGrossRecognized}
                   label="peso bruto"
+                  isOnline={!isOffline}
                 />
               </div>
               <div className="space-y-2">
@@ -678,6 +681,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
                   onWeightRecognized={handleTareRecognized}
                   onBothWeightsRecognized={handleBothWeightsRecognized}
                   label="tara"
+                  isOnline={!isOffline}
                 />
               </div>
             </div>
@@ -773,6 +777,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
                   onWeightRecognized={handleTareRecognized}
                   onBothWeightsRecognized={handleBothWeightsRecognized}
                   label="tara/pbt"
+                  isOnline={!isOffline}
                 />
               )}
             </div>
