@@ -99,8 +99,16 @@ export function useSyncManager({
 
     const pendingRecords = getPendingRecords();
     
-    if (pendingRecords.length === 0) {
-      toast.info('Nenhum registro pendente para sincronizar');
+    // Filter out offline records - they require manager approval before syncing
+    const recordsToSync = pendingRecords.filter(r => !r.createdOffline);
+    
+    if (recordsToSync.length === 0) {
+      const offlineCount = pendingRecords.filter(r => r.createdOffline).length;
+      if (offlineCount > 0) {
+        toast.info(`${offlineCount} registro(s) offline aguardando aprovação do gestor`);
+      } else {
+        toast.info('Nenhum registro pendente para sincronizar');
+      }
       return;
     }
 
@@ -108,12 +116,12 @@ export function useSyncManager({
     setConnectionStatus('syncing');
     setSyncQueue(prev => ({ ...prev, isProcessing: true }));
 
-    toast.info(`Sincronizando ${pendingRecords.length} registro(s)...`);
+    toast.info(`Sincronizando ${recordsToSync.length} registro(s)...`);
 
     let successCount = 0;
     let errorCount = 0;
 
-    for (const record of pendingRecords) {
+    for (const record of recordsToSync) {
       const success = await syncRecord(record);
       if (success) {
         successCount++;
