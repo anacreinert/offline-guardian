@@ -14,9 +14,11 @@ import {
   Hash,
   Building,
   Calendar,
-  Gauge
+  Gauge,
+  Camera,
+  AlertTriangle
 } from 'lucide-react';
-import { WeighingRecord, SyncStatus, VEHICLE_TYPES } from '@/types/weighing';
+import { WeighingRecord, SyncStatus, VEHICLE_TYPES, WEIGHT_METHOD_LABELS } from '@/types/weighing';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { PhotoViewer } from '@/components/PhotoViewer';
@@ -143,6 +145,19 @@ export function RecordsList({ records, onRetrySingle, filter, onFilterChange }: 
                       {record.ticketNumber}
                     </span>
                   )}
+                  {/* Weight Method Badge */}
+                  {record.isEstimated && (
+                    <span className="flex items-center gap-1 text-xs bg-status-syncing/20 text-status-syncing px-2 py-0.5 rounded-full">
+                      <AlertTriangle className="w-3 h-3" />
+                      EST
+                    </span>
+                  )}
+                  {record.weightMethod === 'display_ocr' && !record.isEstimated && (
+                    <span className="flex items-center gap-1 text-xs bg-blue-500/20 text-blue-500 px-2 py-0.5 rounded-full">
+                      <Camera className="w-3 h-3" />
+                      OCR
+                    </span>
+                  )}
                   <Truck className="w-5 h-5 text-muted-foreground shrink-0" />
                   <span className="font-mono font-semibold text-lg">
                     {record.vehiclePlate}
@@ -215,6 +230,17 @@ export function RecordsList({ records, onRetrySingle, filter, onFilterChange }: 
                     <div>
                       <span className="text-muted-foreground block mb-1">Nº Balança</span>
                       <span className="font-mono">{record.scaleNumber || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block mb-1">Método Pesagem</span>
+                      <span className={cn(
+                        "font-medium",
+                        record.isEstimated && "text-status-syncing",
+                        record.weightMethod === 'display_ocr' && "text-blue-500"
+                      )}>
+                        {record.weightMethod ? WEIGHT_METHOD_LABELS[record.weightMethod] : 'Balança'}
+                        {record.isEstimated && ' ⚠️'}
+                      </span>
                     </div>
                     <div>
                       <span className="text-muted-foreground block mb-1">Data</span>

@@ -68,10 +68,12 @@ export type Database = {
           destination: string | null
           driver_name: string | null
           entry_time: string | null
+          estimated_reason: string | null
           exit_time: string | null
           gross_weight: number
           harvest: string | null
           id: string
+          is_estimated: boolean | null
           net_weight: number
           notes: string | null
           origin: string | null
@@ -90,6 +92,7 @@ export type Database = {
           user_id: string
           vehicle_plate: string
           vehicle_type: string | null
+          weight_method: string | null
         }
         Insert: {
           approved_at?: string | null
@@ -99,10 +102,12 @@ export type Database = {
           destination?: string | null
           driver_name?: string | null
           entry_time?: string | null
+          estimated_reason?: string | null
           exit_time?: string | null
           gross_weight: number
           harvest?: string | null
           id?: string
+          is_estimated?: boolean | null
           net_weight: number
           notes?: string | null
           origin?: string | null
@@ -121,6 +126,7 @@ export type Database = {
           user_id: string
           vehicle_plate: string
           vehicle_type?: string | null
+          weight_method?: string | null
         }
         Update: {
           approved_at?: string | null
@@ -130,10 +136,12 @@ export type Database = {
           destination?: string | null
           driver_name?: string | null
           entry_time?: string | null
+          estimated_reason?: string | null
           exit_time?: string | null
           gross_weight?: number
           harvest?: string | null
           id?: string
+          is_estimated?: boolean | null
           net_weight?: number
           notes?: string | null
           origin?: string | null
@@ -152,6 +160,7 @@ export type Database = {
           user_id?: string
           vehicle_plate?: string
           vehicle_type?: string | null
+          weight_method?: string | null
         }
         Relationships: []
       }

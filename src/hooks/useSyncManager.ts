@@ -106,13 +106,17 @@ export function useSyncManager({
           entry_time: record.entryTime?.toISOString() || null,
           exit_time: record.exitTime?.toISOString() || null,
           status: record.status || 'completed',
+          // Weight method
+          weight_method: record.weightMethod || 'scale',
+          is_estimated: record.isEstimated || false,
+          estimated_reason: record.estimatedReason || null,
           // Additional
           notes: record.notes || null,
           created_offline: record.createdOffline,
           synced_at: new Date().toISOString(),
           created_at: record.timestamp.toISOString(),
           photo_urls: photoUrls,
-        });
+        } as any);
 
       if (error) {
         // If record already exists, consider it synced
