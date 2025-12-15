@@ -24,6 +24,52 @@ export function useSyncManager({
 }: SyncManagerOptions) {
   const isSyncing = useRef(false);
 
+  // Upload photos to storage and return URLs
+  const uploadPhotos = async (record: WeighingRecord, userId: string): Promise<Record<string, string>> => {
+    const photoUrls: Record<string, string> = {};
+    
+    if (!record.photos || record.photos.length === 0) {
+      return photoUrls;
+    }
+
+    for (const photo of record.photos) {
+      try {
+        // Convert data URL to blob
+        const response = await fetch(photo.dataUrl);
+        const blob = await response.blob();
+
+        // Generate unique filename
+        const timestamp = new Date().getTime();
+        const extension = photo.format === 'png' ? 'png' : 'jpg';
+        const filePath = `${userId}/${record.id}/${photo.category}_${timestamp}.${extension}`;
+
+        // Upload to Supabase Storage
+        const { data, error: uploadError } = await supabase.storage
+          .from('weighing-photos')
+          .upload(filePath, blob, {
+            contentType: `image/${extension}`,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          continue;
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('weighing-photos')
+          .getPublicUrl(data.path);
+
+        photoUrls[photo.category] = urlData.publicUrl;
+      } catch (err) {
+        console.error('Photo upload error:', err);
+      }
+    }
+
+    return photoUrls;
+  };
+
   const syncToDatabase = async (record: WeighingRecord): Promise<boolean> => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -32,6 +78,9 @@ export function useSyncManager({
         console.error('User not authenticated');
         return false;
       }
+
+      // Upload photos first
+      const photoUrls = await uploadPhotos(record, user.id);
 
       const { error } = await supabase
         .from('weighing_records')
@@ -50,6 +99,7 @@ export function useSyncManager({
           created_offline: record.createdOffline,
           synced_at: new Date().toISOString(),
           created_at: record.timestamp.toISOString(),
+          photo_urls: photoUrls,
         });
 
       if (error) {
