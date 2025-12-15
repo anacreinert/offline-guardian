@@ -87,14 +87,26 @@ export function useSyncManager({
         .insert({
           id: record.id,
           user_id: user.id,
+          // Identification
+          ticket_number: record.ticketNumber || null,
           vehicle_plate: record.vehiclePlate,
+          vehicle_type: record.vehicleType || null,
           driver_name: record.driverName || null,
+          supplier: record.supplier || null,
+          origin: record.origin || null,
+          // Product
           product: record.product || null,
+          harvest: record.harvest || null,
+          destination: record.destination || null,
+          // Weighing
           gross_weight: record.grossWeight,
           tare_weight: record.tareWeight,
           net_weight: record.netWeight,
-          origin: record.origin || null,
-          destination: record.destination || null,
+          scale_number: record.scaleNumber || null,
+          entry_time: record.entryTime?.toISOString() || null,
+          exit_time: record.exitTime?.toISOString() || null,
+          status: record.status || 'completed',
+          // Additional
           notes: record.notes || null,
           created_offline: record.createdOffline,
           synced_at: new Date().toISOString(),

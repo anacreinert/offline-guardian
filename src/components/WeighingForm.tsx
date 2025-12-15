@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Scale, Truck, User, Package, MapPin, FileText, Save } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Scale, Truck, User, Package, MapPin, FileText, Save, Hash, Building, Calendar, Gauge } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,10 +11,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { WeighingRecord, PhotoData } from '@/types/weighing';
+import { WeighingRecord, PhotoData, VEHICLE_TYPES, HARVESTS, VehicleType } from '@/types/weighing';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { CategoryPhotoCapture } from '@/components/CategoryPhotoCapture';
+import { Separator } from '@/components/ui/separator';
 
 // Santa Catarina cities
 const SC_CITIES = [
@@ -76,21 +77,36 @@ interface WeighingFormProps {
   onSubmit: (data: Omit<WeighingRecord, 'id' | 'timestamp' | 'syncStatus' | 'syncAttempts' | 'createdOffline'>) => void;
 }
 
+// Generate ticket number in format YYYY-MM-XXXX
+const generateTicketNumber = () => {
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const seq = Math.floor(Math.random() * 9999) + 1;
+  return `${yearMonth}-${String(seq).padStart(4, '0')}`;
+};
+
 export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
   const [vehiclePlatePhoto, setVehiclePlatePhoto] = useState<PhotoData | null>(null);
   const [tarePhoto, setTarePhoto] = useState<PhotoData | null>(null);
   const [productPhoto, setProductPhoto] = useState<PhotoData | null>(null);
-  const [scalePhoto, setScalePhoto] = useState<PhotoData | null>(null);
   
   const [formData, setFormData] = useState({
+    // Identification
+    ticketNumber: generateTicketNumber(),
     vehiclePlate: '',
+    vehicleType: '' as VehicleType | '',
     driverName: '',
+    supplier: '',
+    origin: '',
+    // Product
     product: '',
-    scaleWeight: '',
+    harvest: '',
+    destination: '',
+    // Weighing
     grossWeight: '',
     tareWeight: '',
-    origin: '',
-    destination: '',
+    scaleNumber: '',
+    // Additional
     notes: '',
   });
 
@@ -123,31 +139,12 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
     }));
   };
 
-  const handleScaleWeightRecognized = (weight: number) => {
-    setFormData(prev => ({ ...prev, scaleWeight: weight.toFixed(3) }));
-  };
-
   const handleProductRecognized = (product: string) => {
     setFormData(prev => ({ ...prev, product }));
   };
 
-  const formatWeight = (value: string): string => {
-    // Remove non-numeric characters except decimal point
-    const cleanValue = value.replace(/[^\d.]/g, '');
-    const numValue = parseFloat(cleanValue);
-    
-    if (isNaN(numValue)) return '';
-    
-    // Format with 3 decimal places
-    return numValue.toLocaleString('pt-BR', { 
-      minimumFractionDigits: 3, 
-      maximumFractionDigits: 3 
-    });
-  };
-
   const handleWeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    // Allow only numbers and decimal point during input
     const cleanValue = value.replace(/[^\d.]/g, '');
     setFormData(prev => ({ ...prev, [name]: cleanValue }));
   };
@@ -157,17 +154,39 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
     if (value) {
       const numValue = parseFloat(value);
       if (!isNaN(numValue)) {
-        // Store as number string with 3 decimal places
         setFormData(prev => ({ ...prev, [name]: numValue.toFixed(3) }));
       }
     }
   };
 
+  const validateForm = (): boolean => {
+    if (!formData.vehiclePlate) {
+      toast.error('Placa do veículo é obrigatória');
+      return false;
+    }
+    if (!formData.grossWeight || Number(formData.grossWeight) <= 0) {
+      toast.error('Peso bruto é obrigatório');
+      return false;
+    }
+    if (!formData.tareWeight || Number(formData.tareWeight) <= 0) {
+      toast.error('Tara é obrigatória');
+      return false;
+    }
+    if (Number(formData.grossWeight) <= Number(formData.tareWeight)) {
+      toast.error('Peso bruto deve ser maior que a tara');
+      return false;
+    }
+    if (!formData.product) {
+      toast.error('Produto é obrigatório');
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.vehiclePlate || !formData.grossWeight || !formData.tareWeight) {
-      toast.error('Preencha os campos obrigatórios');
+    if (!validateForm()) {
       return;
     }
 
@@ -175,38 +194,54 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
       vehiclePlatePhoto,
       tarePhoto,
       productPhoto,
-      scalePhoto,
     ].filter((p): p is PhotoData => p !== null);
 
+    const now = new Date();
+
     onSubmit({
+      // Identification
+      ticketNumber: formData.ticketNumber,
       vehiclePlate: formData.vehiclePlate.toUpperCase(),
+      vehicleType: formData.vehicleType || undefined,
       driverName: formData.driverName,
+      supplier: formData.supplier,
+      origin: formData.origin,
+      // Product
       product: formData.product,
+      harvest: formData.harvest,
+      destination: formData.destination,
+      // Weighing
       grossWeight: Number(formData.grossWeight),
       tareWeight: Number(formData.tareWeight),
       netWeight,
-      origin: formData.origin,
-      destination: formData.destination,
+      scaleNumber: formData.scaleNumber,
+      entryTime: now,
+      exitTime: now,
+      status: 'completed',
+      // Additional
       notes: formData.notes,
       photos: photos.length > 0 ? photos : undefined,
     });
 
-    // Reset form
+    // Reset form with new ticket number
     setFormData({
+      ticketNumber: generateTicketNumber(),
       vehiclePlate: '',
+      vehicleType: '',
       driverName: '',
+      supplier: '',
+      origin: '',
       product: '',
-      scaleWeight: '',
+      harvest: '',
+      destination: '',
       grossWeight: '',
       tareWeight: '',
-      origin: '',
-      destination: '',
+      scaleNumber: '',
       notes: '',
     });
     setVehiclePlatePhoto(null);
     setTarePhoto(null);
     setProductPhoto(null);
-    setScalePhoto(null);
 
     toast.success(
       isOffline 
@@ -215,257 +250,340 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
     );
   };
 
-  const displayWeight = (value: string) => {
-    if (!value) return '';
-    const numValue = parseFloat(value);
-    if (isNaN(numValue)) return value;
-    return numValue.toLocaleString('pt-BR', { 
-      minimumFractionDigits: 3, 
-      maximumFractionDigits: 3 
-    });
-  };
-
   return (
     <form onSubmit={handleSubmit} className="glass-panel p-6 space-y-6">
       <div className="flex items-center gap-3 mb-6">
         <div className="p-3 rounded-xl bg-primary/10">
           <Scale className="w-6 h-6 text-primary" />
         </div>
-        <div>
+        <div className="flex-1">
           <h2 className="text-xl font-semibold">Novo Registro de Pesagem</h2>
           <p className="text-sm text-muted-foreground">
             {isOffline ? 'Modo offline - dados serão sincronizados depois' : 'Sistema conectado'}
           </p>
         </div>
+        <div className="text-right">
+          <p className="text-xs text-muted-foreground">Ticket</p>
+          <p className="font-mono font-bold text-primary">{formData.ticketNumber}</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Vehicle Plate */}
-        <div className="space-y-2">
-          <Label htmlFor="vehiclePlate" className="flex items-center gap-2">
-            <Truck className="w-4 h-4 text-muted-foreground" />
-            Placa do Veículo *
-          </Label>
-          <div className="flex gap-2">
-            <Input
-              id="vehiclePlate"
-              name="vehiclePlate"
-              value={formData.vehiclePlate}
-              onChange={handleChange}
-              placeholder="ABC1D23 ou ABC-1234"
-              className="uppercase font-mono text-lg flex-1"
-              maxLength={8}
-            />
-            <CategoryPhotoCapture
-              category="vehiclePlate"
-              photo={vehiclePlatePhoto}
-              onPhotoChange={setVehiclePlatePhoto}
-              onPlateRecognized={handlePlateRecognized}
-              label="placa"
-            />
+      {/* SEÇÃO 1: IDENTIFICAÇÃO */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Truck className="w-5 h-5 text-primary" />
+          <h3 className="font-semibold text-lg">Identificação</h3>
+        </div>
+        <Separator className="bg-border/50" />
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Vehicle Plate */}
+          <div className="space-y-2">
+            <Label htmlFor="vehiclePlate" className="flex items-center gap-2">
+              <Hash className="w-4 h-4 text-muted-foreground" />
+              Placa do Veículo *
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="vehiclePlate"
+                name="vehiclePlate"
+                value={formData.vehiclePlate}
+                onChange={handleChange}
+                placeholder="ABC1D23"
+                className="uppercase font-mono text-lg flex-1"
+                maxLength={8}
+              />
+              <CategoryPhotoCapture
+                category="vehiclePlate"
+                photo={vehiclePlatePhoto}
+                onPhotoChange={setVehiclePlatePhoto}
+                onPlateRecognized={handlePlateRecognized}
+                label="placa"
+              />
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground">Formato Mercosul (ABC1D23) ou antigo (ABC-1234)</p>
-        </div>
 
-        {/* Driver Name */}
-        <div className="space-y-2">
-          <Label htmlFor="driverName" className="flex items-center gap-2">
-            <User className="w-4 h-4 text-muted-foreground" />
-            Nome do Motorista
-          </Label>
-          <Input
-            id="driverName"
-            name="driverName"
-            value={formData.driverName}
-            onChange={handleChange}
-            placeholder="Nome completo"
-          />
-        </div>
-
-        {/* Product */}
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="product" className="flex items-center gap-2">
-            <Package className="w-4 h-4 text-muted-foreground" />
-            Produto
-          </Label>
-          <div className="flex gap-2">
+          {/* Vehicle Type */}
+          <div className="space-y-2">
+            <Label htmlFor="vehicleType" className="flex items-center gap-2">
+              <Truck className="w-4 h-4 text-muted-foreground" />
+              Tipo do Veículo
+            </Label>
             <Select
-              value={formData.product}
-              onValueChange={(value) => handleSelectChange('product', value)}
+              value={formData.vehicleType}
+              onValueChange={(value) => handleSelectChange('vehicleType', value)}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione o produto" />
+                <SelectValue placeholder="Selecione o tipo" />
               </SelectTrigger>
               <SelectContent className="bg-background border z-50">
-                {AGRO_PRODUCTS.map((product) => (
-                  <SelectItem key={product} value={product}>
-                    {product}
+                {VEHICLE_TYPES.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>
+                    {type.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <CategoryPhotoCapture
-              category="product"
-              photo={productPhoto}
-              onPhotoChange={setProductPhoto}
-              onProductRecognized={handleProductRecognized}
-              label="produto"
+          </div>
+
+          {/* Driver Name */}
+          <div className="space-y-2">
+            <Label htmlFor="driverName" className="flex items-center gap-2">
+              <User className="w-4 h-4 text-muted-foreground" />
+              Nome do Motorista
+            </Label>
+            <Input
+              id="driverName"
+              name="driverName"
+              value={formData.driverName}
+              onChange={handleChange}
+              placeholder="Nome completo"
             />
           </div>
-        </div>
 
-        {/* Scale Weight */}
-        <div className="space-y-2">
-          <Label htmlFor="scaleWeight" className="flex items-center gap-2">
-            <Scale className="w-4 h-4 text-muted-foreground" />
-            Peso da Balança (kg)
-          </Label>
-          <div className="flex gap-2">
+          {/* Supplier */}
+          <div className="space-y-2">
+            <Label htmlFor="supplier" className="flex items-center gap-2">
+              <Building className="w-4 h-4 text-muted-foreground" />
+              Produtor/Fornecedor
+            </Label>
             <Input
-              id="scaleWeight"
-              name="scaleWeight"
+              id="supplier"
+              name="supplier"
+              value={formData.supplier}
+              onChange={handleChange}
+              placeholder="Nome do produtor ou fornecedor"
+            />
+          </div>
+
+          {/* Origin */}
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="origin" className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-muted-foreground" />
+              Origem
+            </Label>
+            <Select
+              value={formData.origin}
+              onValueChange={(value) => handleSelectChange('origin', value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione a cidade de origem" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border z-50 max-h-[300px]">
+                {SC_CITIES.sort().map((city) => (
+                  <SelectItem key={city} value={city}>
+                    {city}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {/* SEÇÃO 2: PRODUTO */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Package className="w-5 h-5 text-primary" />
+          <h3 className="font-semibold text-lg">Produto</h3>
+        </div>
+        <Separator className="bg-border/50" />
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Product */}
+          <div className="space-y-2">
+            <Label htmlFor="product" className="flex items-center gap-2">
+              <Package className="w-4 h-4 text-muted-foreground" />
+              Produto *
+            </Label>
+            <div className="flex gap-2">
+              <Select
+                value={formData.product}
+                onValueChange={(value) => handleSelectChange('product', value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione o produto" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border z-50">
+                  {AGRO_PRODUCTS.map((product) => (
+                    <SelectItem key={product} value={product}>
+                      {product}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <CategoryPhotoCapture
+                category="product"
+                photo={productPhoto}
+                onPhotoChange={setProductPhoto}
+                onProductRecognized={handleProductRecognized}
+                label="produto"
+              />
+            </div>
+          </div>
+
+          {/* Harvest */}
+          <div className="space-y-2">
+            <Label htmlFor="harvest" className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+              Safra
+            </Label>
+            <Select
+              value={formData.harvest}
+              onValueChange={(value) => handleSelectChange('harvest', value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione a safra" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border z-50">
+                {HARVESTS.map((harvest) => (
+                  <SelectItem key={harvest} value={harvest}>
+                    {harvest}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Destination */}
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="destination" className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-muted-foreground" />
+              Destino (Unidade Armazenadora)
+            </Label>
+            <Select
+              value={formData.destination}
+              onValueChange={(value) => handleSelectChange('destination', value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione o destino" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border z-50 max-h-[300px]">
+                {SC_CITIES.sort().map((city) => (
+                  <SelectItem key={city} value={city}>
+                    {city}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {/* SEÇÃO 3: PESAGENS */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Scale className="w-5 h-5 text-primary" />
+          <h3 className="font-semibold text-lg">Pesagens</h3>
+        </div>
+        <Separator className="bg-border/50" />
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Scale Number */}
+          <div className="space-y-2">
+            <Label htmlFor="scaleNumber" className="flex items-center gap-2">
+              <Gauge className="w-4 h-4 text-muted-foreground" />
+              Nº da Balança
+            </Label>
+            <Input
+              id="scaleNumber"
+              name="scaleNumber"
+              value={formData.scaleNumber}
+              onChange={handleChange}
+              placeholder="Ex: BAL-01"
+              className="font-mono"
+            />
+          </div>
+
+          {/* Empty cell for alignment */}
+          <div className="hidden md:block" />
+
+          {/* Gross Weight */}
+          <div className="space-y-2">
+            <Label htmlFor="grossWeight" className="flex items-center gap-2">
+              <Scale className="w-4 h-4 text-muted-foreground" />
+              Peso Bruto - Entrada (kg) *
+            </Label>
+            <p className="text-xs text-muted-foreground">Veículo carregado</p>
+            <Input
+              id="grossWeight"
+              name="grossWeight"
               type="text"
               inputMode="decimal"
-              value={formData.scaleWeight}
+              value={formData.grossWeight}
               onChange={handleWeightChange}
               onBlur={handleWeightBlur}
               placeholder="0,000"
-              className="font-mono text-lg flex-1"
-            />
-            <CategoryPhotoCapture
-              category="tare"
-              photo={scalePhoto}
-              onPhotoChange={setScalePhoto}
-              onWeightRecognized={handleScaleWeightRecognized}
-              label="balança"
+              className="font-mono text-lg"
             />
           </div>
-        </div>
 
-        {/* Gross Weight */}
-        <div className="space-y-2">
-          <Label htmlFor="grossWeight" className="flex items-center gap-2">
-            <Scale className="w-4 h-4 text-muted-foreground" />
-            Peso Bruto (kg) *
-          </Label>
-          <Input
-            id="grossWeight"
-            name="grossWeight"
-            type="text"
-            inputMode="decimal"
-            value={formData.grossWeight}
-            onChange={handleWeightChange}
-            onBlur={handleWeightBlur}
-            placeholder="0,000"
-            className="font-mono text-lg"
-          />
-        </div>
-
-        {/* Tare Weight */}
-        <div className="space-y-2">
-          <Label htmlFor="tareWeight" className="flex items-center gap-2">
-            <Scale className="w-4 h-4 text-muted-foreground" />
-            Tara (kg) *
-          </Label>
-          <div className="flex gap-2">
-            <Input
-              id="tareWeight"
-              name="tareWeight"
-              type="text"
-              inputMode="decimal"
-              value={formData.tareWeight}
-              onChange={handleWeightChange}
-              onBlur={handleWeightBlur}
-              placeholder="0,000"
-              className="font-mono text-lg flex-1"
-            />
-            <CategoryPhotoCapture
-              category="tare"
-              photo={tarePhoto}
-              onPhotoChange={setTarePhoto}
-              onWeightRecognized={handleTareRecognized}
-              onBothWeightsRecognized={handleBothWeightsRecognized}
-              label="tara/pbt"
-            />
+          {/* Tare Weight */}
+          <div className="space-y-2">
+            <Label htmlFor="tareWeight" className="flex items-center gap-2">
+              <Scale className="w-4 h-4 text-muted-foreground" />
+              Tara - Saída (kg) *
+            </Label>
+            <p className="text-xs text-muted-foreground">Veículo vazio</p>
+            <div className="flex gap-2">
+              <Input
+                id="tareWeight"
+                name="tareWeight"
+                type="text"
+                inputMode="decimal"
+                value={formData.tareWeight}
+                onChange={handleWeightChange}
+                onBlur={handleWeightBlur}
+                placeholder="0,000"
+                className="font-mono text-lg flex-1"
+              />
+              <CategoryPhotoCapture
+                category="tare"
+                photo={tarePhoto}
+                onPhotoChange={setTarePhoto}
+                onWeightRecognized={handleTareRecognized}
+                onBothWeightsRecognized={handleBothWeightsRecognized}
+                label="tara/pbt"
+              />
+            </div>
           </div>
-        </div>
 
-        {/* Net Weight Display */}
-        <div className="md:col-span-2">
-          <div className={cn(
-            'p-4 rounded-xl border-2 border-dashed',
-            'bg-primary/5 border-primary/30'
-          )}>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground font-medium">Peso Líquido</span>
-              <span className="text-3xl font-mono font-bold text-primary">
-                {netWeight.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
-              </span>
+          {/* Net Weight Display */}
+          <div className="md:col-span-2">
+            <div className={cn(
+              'p-4 rounded-xl border-2 border-dashed',
+              'bg-primary/5 border-primary/30'
+            )}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-muted-foreground font-medium">Peso Líquido</span>
+                  <p className="text-xs text-muted-foreground">Peso Bruto − Tara</p>
+                </div>
+                <span className="text-3xl font-mono font-bold text-primary">
+                  {netWeight.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
+                </span>
+              </div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Origin */}
-        <div className="space-y-2">
-          <Label htmlFor="origin" className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-muted-foreground" />
-            Origem
-          </Label>
-          <Select
-            value={formData.origin}
-            onValueChange={(value) => handleSelectChange('origin', value)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Selecione a cidade de origem" />
-            </SelectTrigger>
-            <SelectContent className="bg-background border z-50 max-h-[300px]">
-              {SC_CITIES.sort().map((city) => (
-                <SelectItem key={city} value={city}>
-                  {city}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* SEÇÃO 4: OBSERVAÇÕES */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <FileText className="w-5 h-5 text-primary" />
+          <h3 className="font-semibold text-lg">Observações</h3>
         </div>
-
-        {/* Destination */}
-        <div className="space-y-2">
-          <Label htmlFor="destination" className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-muted-foreground" />
-            Destino
-          </Label>
-          <Select
-            value={formData.destination}
-            onValueChange={(value) => handleSelectChange('destination', value)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Selecione a cidade de destino" />
-            </SelectTrigger>
-            <SelectContent className="bg-background border z-50 max-h-[300px]">
-              {SC_CITIES.sort().map((city) => (
-                <SelectItem key={city} value={city}>
-                  {city}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Notes */}
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="notes" className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-muted-foreground" />
-            Observações
-          </Label>
-          <Textarea
-            id="notes"
-            name="notes"
-            value={formData.notes}
-            onChange={handleChange}
-            placeholder="Informações adicionais..."
-            rows={3}
-          />
-        </div>
+        <Separator className="bg-border/50" />
+        
+        <Textarea
+          id="notes"
+          name="notes"
+          value={formData.notes}
+          onChange={handleChange}
+          placeholder="Informações adicionais, exceções operacionais, etc."
+          rows={3}
+        />
       </div>
 
       <Button 

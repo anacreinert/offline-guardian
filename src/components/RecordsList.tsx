@@ -10,9 +10,13 @@ import {
   ChevronDown,
   ChevronUp,
   Filter,
-  Image
+  Image,
+  Hash,
+  Building,
+  Calendar,
+  Gauge
 } from 'lucide-react';
-import { WeighingRecord, SyncStatus } from '@/types/weighing';
+import { WeighingRecord, SyncStatus, VEHICLE_TYPES } from '@/types/weighing';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { PhotoViewer } from '@/components/PhotoViewer';
@@ -134,6 +138,11 @@ export function RecordsList({ records, onRetrySingle, filter, onFilterChange }: 
 
                 {/* Main Info */}
                 <div className="flex items-center gap-3 flex-1 min-w-0">
+                  {record.ticketNumber && (
+                    <span className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded">
+                      {record.ticketNumber}
+                    </span>
+                  )}
                   <Truck className="w-5 h-5 text-muted-foreground shrink-0" />
                   <span className="font-mono font-semibold text-lg">
                     {record.vehiclePlate}
@@ -176,22 +185,54 @@ export function RecordsList({ records, onRetrySingle, filter, onFilterChange }: 
                 <div className="mt-4 pt-4 border-t border-border/50 animate-fade-in">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
+                      <span className="text-muted-foreground block mb-1">Ticket</span>
+                      <span className="font-mono font-medium">{record.ticketNumber || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block mb-1">Tipo Veículo</span>
+                      <span className="font-medium">
+                        {record.vehicleType 
+                          ? VEHICLE_TYPES.find(t => t.value === record.vehicleType)?.label || record.vehicleType
+                          : '-'}
+                      </span>
+                    </div>
+                    <div>
                       <span className="text-muted-foreground block mb-1">Motorista</span>
                       <span className="font-medium">{record.driverName || '-'}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground block mb-1">Peso Bruto</span>
-                      <span className="font-mono">{record.grossWeight.toLocaleString('pt-BR')} kg</span>
+                      <span className="text-muted-foreground block mb-1">Produtor/Fornecedor</span>
+                      <span className="font-medium">{record.supplier || '-'}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground block mb-1">Tara</span>
-                      <span className="font-mono">{record.tareWeight.toLocaleString('pt-BR')} kg</span>
+                      <span className="text-muted-foreground block mb-1">Produto</span>
+                      <span className="font-medium">{record.product || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block mb-1">Safra</span>
+                      <span className="font-medium">{record.harvest || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block mb-1">Nº Balança</span>
+                      <span className="font-mono">{record.scaleNumber || '-'}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground block mb-1">Data</span>
                       <span className="font-mono">
                         {new Date(record.timestamp).toLocaleDateString('pt-BR')}
                       </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block mb-1">Peso Bruto (Entrada)</span>
+                      <span className="font-mono">{record.grossWeight.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block mb-1">Tara (Saída)</span>
+                      <span className="font-mono">{record.tareWeight.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block mb-1">Peso Líquido</span>
+                      <span className="font-mono font-bold text-primary">{record.netWeight.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground block mb-1">Origem</span>
@@ -201,7 +242,7 @@ export function RecordsList({ records, onRetrySingle, filter, onFilterChange }: 
                       <span className="text-muted-foreground block mb-1">Destino</span>
                       <span>{record.destination || '-'}</span>
                     </div>
-                    <div className="md:col-span-2">
+                    <div className="md:col-span-3">
                       <span className="text-muted-foreground block mb-1">Observações</span>
                       <span>{record.notes || '-'}</span>
                     </div>

@@ -65,14 +65,26 @@ export function useWeighingRecords() {
 
       return (data || []).map(r => ({
         id: r.id,
+        // Identification
+        ticketNumber: r.ticket_number || undefined,
         vehiclePlate: r.vehicle_plate,
+        vehicleType: r.vehicle_type as WeighingRecord['vehicleType'] || undefined,
         driverName: r.driver_name || undefined,
+        supplier: r.supplier || undefined,
+        origin: r.origin || undefined,
+        // Product
         product: r.product || undefined,
+        harvest: r.harvest || undefined,
+        destination: r.destination || undefined,
+        // Weighing
         grossWeight: Number(r.gross_weight),
         tareWeight: Number(r.tare_weight),
         netWeight: Number(r.net_weight),
-        origin: r.origin || undefined,
-        destination: r.destination || undefined,
+        scaleNumber: r.scale_number || undefined,
+        entryTime: r.entry_time ? new Date(r.entry_time) : undefined,
+        exitTime: r.exit_time ? new Date(r.exit_time) : undefined,
+        status: r.status as WeighingRecord['status'] || undefined,
+        // Additional
         notes: r.notes || undefined,
         timestamp: new Date(r.created_at),
         syncStatus: 'synced' as const,
