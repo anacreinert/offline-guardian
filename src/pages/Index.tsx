@@ -57,11 +57,12 @@ const Index = () => {
     }
   }, [isAuthenticated, loading, navigate]);
 
-  // Auto-sync only non-offline records when coming back online
-  // Offline records require manager approval before sync
+  // Auto-sync pending records when coming back online (including offline-created ones)
+  // Offline-created records will be sent with pending_approval status for gestor review
   useEffect(() => {
-    const pendingNonOffline = getPendingRecords().filter(r => !r.createdOffline);
-    if (!isOffline && pendingNonOffline.length > 0 && !syncQueue.isProcessing) {
+    const pending = getPendingRecords();
+
+    if (!isOffline && pending.length > 0 && !syncQueue.isProcessing) {
       // Small delay to ensure stable connection
       const timer = setTimeout(async () => {
         await syncAll();
@@ -74,10 +75,10 @@ const Index = () => {
 
   const handleSubmit = async (data: Parameters<typeof addRecord>[0]) => {
     const newRecord = addRecord(data, isOffline);
-    
-    // If online and NOT created offline, immediately sync the new record
-    // Offline records require manager approval before sync
-    if (!isOffline && !newRecord.createdOffline) {
+
+    // If online, immediately try to sync the new record.
+    // If it was created offline, it will be inserted with pending_approval status for gestor review.
+    if (!isOffline) {
       // Small delay to ensure record is in state
       setTimeout(async () => {
         await syncSingle(newRecord.id);
