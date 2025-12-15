@@ -16,7 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useAuth } from '@/hooks/useAuth';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useWeighingRecords } from '@/hooks/useWeighingRecords';
 import { WeighingRecord } from '@/types/weighing';
 
 type FilterType = 'all' | 'offline' | 'pending';
@@ -45,7 +45,7 @@ const RecordsView = () => {
   const filterType = (searchParams.get('filter') as FilterType) || 'all';
   
   const { isAuthenticated, loading } = useAuth();
-  const { records, getTodayRecords, getPendingRecords } = useLocalStorage();
+  const { records, getTodayRecords, getPendingRecords } = useWeighingRecords();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredRecords, setFilteredRecords] = useState<WeighingRecord[]>([]);
