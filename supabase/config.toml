@@ -1,1 +1,4 @@
 project_id = "zzsfgayueotaeobqzvzc"
+
+[functions.ocr-plate]
+verify_jwt = true

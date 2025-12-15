@@ -105,6 +105,10 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handlePlateRecognized = (plate: string) => {
+    setFormData(prev => ({ ...prev, vehiclePlate: plate }));
+  };
+
   const formatWeight = (value: string): string => {
     // Remove non-numeric characters except decimal point
     const cleanValue = value.replace(/[^\d.]/g, '');
@@ -231,6 +235,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
               category="vehiclePlate"
               photo={vehiclePlatePhoto}
               onPhotoChange={setVehiclePlatePhoto}
+              onPlateRecognized={handlePlateRecognized}
               label="placa"
             />
           </div>
