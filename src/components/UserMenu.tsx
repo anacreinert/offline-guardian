@@ -74,7 +74,7 @@ export function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {canAccessGestorFeatures() && (
+        {profile.role === 'gestor' && (
           <DropdownMenuItem 
             onClick={() => navigate('/reports')}
             className="cursor-pointer"
