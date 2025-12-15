@@ -10,6 +10,7 @@ interface CategoryPhotoCaptureProps {
   photo: PhotoData | null;
   onPhotoChange: (photo: PhotoData | null) => void;
   onPlateRecognized?: (plate: string) => void;
+  onWeightRecognized?: (weight: number) => void;
   label: string;
   disabled?: boolean;
 }
@@ -19,11 +20,12 @@ export function CategoryPhotoCapture({
   photo, 
   onPhotoChange, 
   onPlateRecognized,
+  onWeightRecognized,
   label,
   disabled = false 
 }: CategoryPhotoCaptureProps) {
   const { isCapturing, error, takePhoto } = useCamera();
-  const { isProcessing, recognizePlate } = useOCR();
+  const { isProcessing, recognizePlate, recognizeWeight } = useOCR();
 
   const handleTakePhoto = async () => {
     const captured = await takePhoto();
@@ -47,6 +49,19 @@ export function CategoryPhotoCapture({
           toast.success(`Placa identificada: ${result.plate}`);
         } else {
           toast.warning('Não foi possível identificar a placa automaticamente');
+        }
+      }
+
+      // If this is a tare weight photo, run weight OCR
+      if (category === 'tare' && onWeightRecognized) {
+        toast.info('Processando OCR do peso da tara...');
+        const result = await recognizeWeight(captured.dataUrl, 'tare');
+        
+        if (result?.success && result.weight) {
+          onWeightRecognized(result.weight);
+          toast.success(`Tara identificada: ${result.weight} kg`);
+        } else {
+          toast.warning('Não foi possível identificar a tara automaticamente');
         }
       }
     } else if (error) {

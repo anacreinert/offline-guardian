@@ -2,3 +2,6 @@ project_id = "zzsfgayueotaeobqzvzc"
 
 [functions.ocr-plate]
 verify_jwt = true
+
+[functions.ocr-weight]
+verify_jwt = true
