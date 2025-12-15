@@ -4,9 +4,71 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { WeighingRecord } from '@/types/weighing';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
+// Santa Catarina cities
+const SC_CITIES = [
+  'Florianópolis',
+  'Joinville',
+  'Blumenau',
+  'São José',
+  'Chapecó',
+  'Criciúma',
+  'Itajaí',
+  'Jaraguá do Sul',
+  'Lages',
+  'Palhoça',
+  'Balneário Camboriú',
+  'Brusque',
+  'Tubarão',
+  'São Bento do Sul',
+  'Caçador',
+  'Concórdia',
+  'Camboriú',
+  'Navegantes',
+  'Rio do Sul',
+  'Araranguá',
+  'Gaspar',
+  'Biguaçu',
+  'Indaial',
+  'Mafra',
+  'Canoinhas',
+  'Içara',
+  'Laguna',
+  'Videira',
+  'Xanxerê',
+  'São Francisco do Sul',
+  'Joaçaba',
+  'Imbituba',
+  'Tijucas',
+  'Curitibanos',
+  'Porto União',
+  'Campos Novos',
+  'Fraiburgo',
+  'Penha',
+  'Guaramirim',
+  'Sombrio',
+];
+
+// Agricultural products
+const AGRO_PRODUCTS = [
+  'Soja',
+  'Milho',
+  'Trigo',
+  'Sorgo',
+  'Café',
+  'Feijão',
+  'Arroz',
+];
 
 interface WeighingFormProps {
   isOffline: boolean;
@@ -32,6 +94,42 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const formatWeight = (value: string): string => {
+    // Remove non-numeric characters except decimal point
+    const cleanValue = value.replace(/[^\d.]/g, '');
+    const numValue = parseFloat(cleanValue);
+    
+    if (isNaN(numValue)) return '';
+    
+    // Format with 3 decimal places
+    return numValue.toLocaleString('pt-BR', { 
+      minimumFractionDigits: 3, 
+      maximumFractionDigits: 3 
+    });
+  };
+
+  const handleWeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    // Allow only numbers and decimal point during input
+    const cleanValue = value.replace(/[^\d.]/g, '');
+    setFormData(prev => ({ ...prev, [name]: cleanValue }));
+  };
+
+  const handleWeightBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (value) {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue)) {
+        // Store as number string with 3 decimal places
+        setFormData(prev => ({ ...prev, [name]: numValue.toFixed(3) }));
+      }
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -71,6 +169,16 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
         ? 'Registro salvo localmente. Será sincronizado quando houver conexão.'
         : 'Registro salvo e sincronizado com sucesso!'
     );
+  };
+
+  const displayWeight = (value: string) => {
+    if (!value) return '';
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) return value;
+    return numValue.toLocaleString('pt-BR', { 
+      minimumFractionDigits: 3, 
+      maximumFractionDigits: 3 
+    });
   };
 
   return (
@@ -127,13 +235,21 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
             <Package className="w-4 h-4 text-muted-foreground" />
             Produto
           </Label>
-          <Input
-            id="product"
-            name="product"
+          <Select
             value={formData.product}
-            onChange={handleChange}
-            placeholder="Tipo de carga"
-          />
+            onValueChange={(value) => handleSelectChange('product', value)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Selecione o produto" />
+            </SelectTrigger>
+            <SelectContent className="bg-background border z-50">
+              {AGRO_PRODUCTS.map((product) => (
+                <SelectItem key={product} value={product}>
+                  {product}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Gross Weight */}
@@ -145,13 +261,13 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
           <Input
             id="grossWeight"
             name="grossWeight"
-            type="number"
+            type="text"
+            inputMode="decimal"
             value={formData.grossWeight}
-            onChange={handleChange}
-            placeholder="0.000"
+            onChange={handleWeightChange}
+            onBlur={handleWeightBlur}
+            placeholder="0,000"
             className="font-mono text-lg"
-            step="0.001"
-            min="0"
           />
         </div>
 
@@ -164,13 +280,13 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
           <Input
             id="tareWeight"
             name="tareWeight"
-            type="number"
+            type="text"
+            inputMode="decimal"
             value={formData.tareWeight}
-            onChange={handleChange}
-            placeholder="0.000"
+            onChange={handleWeightChange}
+            onBlur={handleWeightBlur}
+            placeholder="0,000"
             className="font-mono text-lg"
-            step="0.001"
-            min="0"
           />
         </div>
 
@@ -195,13 +311,21 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
             <MapPin className="w-4 h-4 text-muted-foreground" />
             Origem
           </Label>
-          <Input
-            id="origin"
-            name="origin"
+          <Select
             value={formData.origin}
-            onChange={handleChange}
-            placeholder="Local de origem"
-          />
+            onValueChange={(value) => handleSelectChange('origin', value)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Selecione a cidade de origem" />
+            </SelectTrigger>
+            <SelectContent className="bg-background border z-50 max-h-[300px]">
+              {SC_CITIES.sort().map((city) => (
+                <SelectItem key={city} value={city}>
+                  {city}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Destination */}
@@ -210,13 +334,21 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
             <MapPin className="w-4 h-4 text-muted-foreground" />
             Destino
           </Label>
-          <Input
-            id="destination"
-            name="destination"
+          <Select
             value={formData.destination}
-            onChange={handleChange}
-            placeholder="Local de destino"
-          />
+            onValueChange={(value) => handleSelectChange('destination', value)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Selecione a cidade de destino" />
+            </SelectTrigger>
+            <SelectContent className="bg-background border z-50 max-h-[300px]">
+              {SC_CITIES.sort().map((city) => (
+                <SelectItem key={city} value={city}>
+                  {city}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Notes */}
