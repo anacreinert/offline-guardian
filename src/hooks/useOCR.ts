@@ -1,8 +1,14 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-interface OCRResult {
+interface PlateOCRResult {
   plate: string | null;
+  raw: string;
+  success: boolean;
+}
+
+interface WeightOCRResult {
+  weight: number | null;
   raw: string;
   success: boolean;
 }
@@ -11,7 +17,7 @@ export function useOCR() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const recognizePlate = async (imageDataUrl: string): Promise<OCRResult | null> => {
+  const recognizePlate = async (imageDataUrl: string): Promise<PlateOCRResult | null> => {
     setIsProcessing(true);
     setError(null);
 
@@ -46,9 +52,45 @@ export function useOCR() {
     }
   };
 
+  const recognizeWeight = async (imageDataUrl: string, weightType: 'tare' | 'gross'): Promise<WeightOCRResult | null> => {
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('ocr-weight', {
+        body: { imageBase64: imageDataUrl, weightType },
+      });
+
+      if (fnError) {
+        console.error('OCR weight function error:', fnError);
+        setError(fnError.message);
+        return null;
+      }
+
+      if (data.error) {
+        setError(data.error);
+        return null;
+      }
+
+      return {
+        weight: data.weight,
+        raw: data.raw,
+        success: data.success,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Weight OCR failed';
+      setError(message);
+      console.error('Weight OCR error:', err);
+      return null;
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return {
     isProcessing,
     error,
     recognizePlate,
+    recognizeWeight,
   };
 }
