@@ -103,6 +103,8 @@ export function useSyncManager({
           tare_weight: record.tareWeight,
           net_weight: record.netWeight,
           scale_number: record.scaleNumber || null,
+          entry_time: record.entryTime?.toISOString() || null,
+          exit_time: record.exitTime?.toISOString() || null,
           // Set status based on whether it was created offline
           status: record.createdOffline ? 'pending_approval' : (record.status || 'completed'),
           // Weight method
@@ -209,6 +211,7 @@ export function useSyncManager({
 
   const syncSingle = useCallback(async (recordId: string) => {
     if (!isOnline) {
+      toast.error('Sem conexão com a rede');
       console.log('Cannot sync - offline');
       return false;
     }
