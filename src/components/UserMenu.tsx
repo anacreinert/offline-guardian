@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, Shield, ChevronDown, Users } from 'lucide-react';
+import { LogOut, User, Shield, ChevronDown, Users, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -27,7 +27,7 @@ const roleColors: Record<AppRole, string> = {
 };
 
 export function UserMenu() {
-  const { profile, signOut, canAccessAdminFeatures } = useAuth();
+  const { profile, signOut, canAccessAdminFeatures, canAccessGestorFeatures } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -74,17 +74,26 @@ export function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {canAccessGestorFeatures() && (
+          <DropdownMenuItem 
+            onClick={() => navigate('/reports')}
+            className="cursor-pointer"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Relatórios e Aprovações
+          </DropdownMenuItem>
+        )}
         {canAccessAdminFeatures() && (
-          <>
-            <DropdownMenuItem 
-              onClick={() => navigate('/users')}
-              className="cursor-pointer"
-            >
-              <Users className="w-4 h-4 mr-2" />
-              Gerenciar Usuários
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
+          <DropdownMenuItem 
+            onClick={() => navigate('/users')}
+            className="cursor-pointer"
+          >
+            <Users className="w-4 h-4 mr-2" />
+            Gerenciar Usuários
+          </DropdownMenuItem>
+        )}
+        {(canAccessGestorFeatures() || canAccessAdminFeatures()) && (
+          <DropdownMenuSeparator />
         )}
         <DropdownMenuItem 
           onClick={handleLogout} 
