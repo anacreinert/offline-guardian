@@ -301,6 +301,19 @@ export function RecordsList({ records, onRetrySingle, filter, onFilterChange }: 
                     </div>
                   )}
 
+                  {/* Sync Error Message */}
+                  {record.syncStatus === 'error' && record.syncError && (
+                    <div className="mt-3 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+                      <div className="flex items-start gap-2 text-sm text-destructive">
+                        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                        <div>
+                          <span className="font-medium">Erro de sincronização:</span>
+                          <p className="mt-0.5 text-destructive/90">{record.syncError}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {record.createdOffline && (
                     <div className="mt-3 flex items-center gap-2 text-xs text-status-offline">
                       <AlertCircle className="w-3.5 h-3.5" />

@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 
 interface SyncManagerOptions {
   getPendingRecords: () => WeighingRecord[];
-  updateRecordSyncStatus: (id: string, status: WeighingRecord['syncStatus']) => void;
+  updateRecordSyncStatus: (id: string, status: WeighingRecord['syncStatus'], error?: string) => void;
   setSyncQueue: React.Dispatch<React.SetStateAction<{
     pendingCount: number;
     lastSyncTime?: Date;
@@ -70,13 +70,13 @@ export function useSyncManager({
     return photoUrls;
   };
 
-  const syncToDatabase = async (record: WeighingRecord): Promise<boolean> => {
+  const syncToDatabase = async (record: WeighingRecord): Promise<{ success: boolean; error?: string }> => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
         console.error('User not authenticated');
-        return false;
+        return { success: false, error: 'Usuário não autenticado' };
       }
 
       // Upload photos first
@@ -123,36 +123,37 @@ export function useSyncManager({
         // If record already exists, consider it synced
         if (error.code === '23505') {
           console.log('Record already exists in database:', record.id);
-          return true;
+          return { success: true };
         }
         console.error('Error syncing record:', error);
-        return false;
+        return { success: false, error: error.message || `Erro: ${error.code}` };
       }
 
       console.log('Record synced successfully:', record.id);
-      return true;
-    } catch (error) {
-      console.error('Error syncing record:', error);
-      return false;
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error syncing record:', err);
+      return { success: false, error: err?.message || 'Erro desconhecido' };
     }
   };
 
-  const syncRecord = useCallback(async (record: WeighingRecord) => {
+  const syncRecord = useCallback(async (record: WeighingRecord): Promise<{ success: boolean; error?: string }> => {
     updateRecordSyncStatus(record.id, 'syncing');
     
     try {
-      const success = await syncToDatabase(record);
+      const result = await syncToDatabase(record);
       
-      if (success) {
+      if (result.success) {
         updateRecordSyncStatus(record.id, 'synced');
-        return true;
+        return { success: true };
       } else {
-        updateRecordSyncStatus(record.id, 'error');
-        return false;
+        updateRecordSyncStatus(record.id, 'error', result.error);
+        return { success: false, error: result.error };
       }
-    } catch (error) {
-      updateRecordSyncStatus(record.id, 'error');
-      return false;
+    } catch (err: any) {
+      const errorMsg = err?.message || 'Erro desconhecido';
+      updateRecordSyncStatus(record.id, 'error', errorMsg);
+      return { success: false, error: errorMsg };
     }
   }, [updateRecordSyncStatus]);
 
@@ -184,8 +185,8 @@ export function useSyncManager({
     let errorCount = 0;
 
     for (const record of recordsToSync) {
-      const success = await syncRecord(record);
-      if (success) {
+      const result = await syncRecord(record);
+      if (result.success) {
         successCount++;
       } else {
         errorCount++;
@@ -244,20 +245,20 @@ export function useSyncManager({
 
     console.log('Syncing record:', recordId);
     setSyncQueue(prev => ({ ...prev, isProcessing: true }));
-    const success = await syncRecord(record);
+    const result = await syncRecord(record);
     setSyncQueue(prev => ({ 
       ...prev, 
       isProcessing: false,
       lastSyncTime: new Date(),
     }));
 
-    if (success) {
+    if (result.success) {
       toast.success('Registro sincronizado com sucesso!');
     } else {
-      toast.error('Falha ao sincronizar registro');
+      toast.error(result.error || 'Falha ao sincronizar registro');
     }
 
-    return success;
+    return result.success;
   }, [getPendingRecords, syncRecord, setSyncQueue, isOnline]);
 
   return {
