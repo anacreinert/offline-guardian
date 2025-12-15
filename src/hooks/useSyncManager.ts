@@ -174,6 +174,12 @@ export function useSyncManager({
       return false;
     }
 
+    // Block sync for offline records - they require manager approval
+    if (record.createdOffline) {
+      toast.info('Registros offline precisam de aprovação do gestor antes de sincronizar');
+      return false;
+    }
+
     console.log('Syncing record:', recordId);
     setSyncQueue(prev => ({ ...prev, isProcessing: true }));
     const success = await syncRecord(record);
