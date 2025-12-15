@@ -17,17 +17,46 @@ export interface PhotoUrls {
   product?: string;
 }
 
+export type VehicleType = 'truck' | 'carreta' | 'bitrem' | 'rodotrem' | 'outros';
+
+export type WeighingStatus = 'entry' | 'processing' | 'exit' | 'completed';
+
+export const VEHICLE_TYPES: { value: VehicleType; label: string }[] = [
+  { value: 'truck', label: 'Truck' },
+  { value: 'carreta', label: 'Carreta' },
+  { value: 'bitrem', label: 'Bitrem' },
+  { value: 'rodotrem', label: 'Rodotrem' },
+  { value: 'outros', label: 'Outros' },
+];
+
+export const HARVESTS = [
+  '2024/2025',
+  '2025/2026',
+];
+
 export interface WeighingRecord {
   id: string;
   timestamp: Date;
+  // Identification
+  ticketNumber?: string;
   vehiclePlate: string;
+  vehicleType?: VehicleType;
   driverName: string;
+  supplier?: string;
+  origin: string;
+  // Product
   product: string;
+  harvest?: string;
+  destination: string;
+  // Weighing
   grossWeight: number;
   tareWeight: number;
   netWeight: number;
-  origin: string;
-  destination: string;
+  scaleNumber?: string;
+  entryTime?: Date;
+  exitTime?: Date;
+  status?: WeighingStatus;
+  // Additional
   notes?: string;
   photos?: PhotoData[];
   photoUrls?: PhotoUrls;

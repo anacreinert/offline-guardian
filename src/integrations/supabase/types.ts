@@ -67,7 +67,10 @@ export type Database = {
           created_offline: boolean | null
           destination: string | null
           driver_name: string | null
+          entry_time: string | null
+          exit_time: string | null
           gross_weight: number
+          harvest: string | null
           id: string
           net_weight: number
           notes: string | null
@@ -77,11 +80,16 @@ export type Database = {
           rejected_at: string | null
           rejected_by: string | null
           rejection_reason: string | null
+          scale_number: string | null
+          status: string | null
+          supplier: string | null
           synced_at: string | null
           tare_weight: number
+          ticket_number: string | null
           updated_at: string
           user_id: string
           vehicle_plate: string
+          vehicle_type: string | null
         }
         Insert: {
           approved_at?: string | null
@@ -90,7 +98,10 @@ export type Database = {
           created_offline?: boolean | null
           destination?: string | null
           driver_name?: string | null
+          entry_time?: string | null
+          exit_time?: string | null
           gross_weight: number
+          harvest?: string | null
           id?: string
           net_weight: number
           notes?: string | null
@@ -100,11 +111,16 @@ export type Database = {
           rejected_at?: string | null
           rejected_by?: string | null
           rejection_reason?: string | null
+          scale_number?: string | null
+          status?: string | null
+          supplier?: string | null
           synced_at?: string | null
           tare_weight: number
+          ticket_number?: string | null
           updated_at?: string
           user_id: string
           vehicle_plate: string
+          vehicle_type?: string | null
         }
         Update: {
           approved_at?: string | null
@@ -113,7 +129,10 @@ export type Database = {
           created_offline?: boolean | null
           destination?: string | null
           driver_name?: string | null
+          entry_time?: string | null
+          exit_time?: string | null
           gross_weight?: number
+          harvest?: string | null
           id?: string
           net_weight?: number
           notes?: string | null
@@ -123,11 +142,16 @@ export type Database = {
           rejected_at?: string | null
           rejected_by?: string | null
           rejection_reason?: string | null
+          scale_number?: string | null
+          status?: string | null
+          supplier?: string | null
           synced_at?: string | null
           tare_weight?: number
+          ticket_number?: string | null
           updated_at?: string
           user_id?: string
           vehicle_plate?: string
+          vehicle_type?: string | null
         }
         Relationships: []
       }
@@ -136,6 +160,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_ticket_number: { Args: never; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
