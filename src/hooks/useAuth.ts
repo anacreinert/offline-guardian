@@ -68,12 +68,14 @@ export function useAuth() {
 
       if (roleError) throw roleError;
 
-      if (profileData && roleData) {
+      if (profileData) {
+        const role = (roleData?.role as AppRole) || 'operador';
+        console.log('User profile loaded:', profileData.full_name, 'Role:', role);
         setProfile({
           id: profileData.id,
           user_id: profileData.user_id,
           full_name: profileData.full_name,
-          role: roleData.role as AppRole,
+          role: role,
         });
       }
     } catch (error) {
