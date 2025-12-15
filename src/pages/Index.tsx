@@ -13,7 +13,10 @@ import { useAuth } from '@/hooks/useAuth';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, loading, profile } = useAuth();
+  const { isAuthenticated, loading, profile, canAccessAdminFeatures } = useAuth();
+  
+  // Admin should not see the weighing form
+  const isAdmin = canAccessAdminFeatures();
   
   const { 
     status, 
@@ -138,16 +141,20 @@ const Index = () => {
         </div>
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          {/* Form */}
-          <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
-            <WeighingForm isOffline={isOffline} onSubmit={handleSubmit} />
-          </div>
+        <div className={isAdmin ? '' : 'grid grid-cols-1 xl:grid-cols-2 gap-8'}>
+          {/* Form - Hidden for Admin */}
+          {!isAdmin && (
+            <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
+              <WeighingForm isOffline={isOffline} onSubmit={handleSubmit} />
+            </div>
+          )}
 
           {/* Records List */}
           <div className="animate-fade-in" style={{ animationDelay: '300ms' }}>
             <div className="flex items-center gap-3 mb-4">
-              <h2 className="text-xl font-semibold">Registros Recentes</h2>
+              <h2 className="text-xl font-semibold">
+                {isAdmin ? 'Todos os Registros' : 'Registros Recentes'}
+              </h2>
             </div>
             <RecordsList
               records={records}
