@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle, Clock, Truck, Package, MapPin, XCircle, Image, Camera, AlertTriangle } from 'lucide-react';
+import { CheckCircle, Clock, Truck, Package, MapPin, XCircle, Image, Camera, AlertTriangle, MoreHorizontal } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { PhotoViewer } from '@/components/PhotoViewer';
@@ -165,23 +171,6 @@ export function ApprovalList({
             <Clock className="w-5 h-5" />
             Pesagens Offline Pendentes
           </CardTitle>
-          {records.length > 0 && (
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                onClick={() => setRejectAllDialogOpen(true)}
-              >
-                <XCircle className="w-4 h-4" />
-                Rejeitar Todos
-              </Button>
-              <Button onClick={onApproveAll} size="sm" className="gap-2">
-                <CheckCircle className="w-4 h-4" />
-                Aprovar Todos ({records.length})
-              </Button>
-            </div>
-          )}
         </div>
         
         {/* Selection controls */}
@@ -198,7 +187,7 @@ export function ApprovalList({
                   ? 'Desmarcar todos' 
                   : `Selecionar todos (${records.length})`}
               </Label>
-              {selectedRecordIds.length > 0 && (
+              {selectedRecordIds.length > 0 && selectedRecordIds.length < records.length && (
                 <Badge variant="secondary" className="ml-2">
                   {selectedRecordIds.length} selecionado(s)
                 </Badge>
@@ -213,11 +202,11 @@ export function ApprovalList({
                   onClick={() => setRejectSelectedDialogOpen(true)}
                 >
                   <XCircle className="w-4 h-4" />
-                  Rejeitar ({selectedRecordIds.length})
+                  {selectedRecordIds.length === records.length ? 'Rejeitar todos' : `Rejeitar (${selectedRecordIds.length})`}
                 </Button>
                 <Button onClick={handleApproveSelected} size="sm" className="gap-2">
                   <CheckCircle className="w-4 h-4" />
-                  Aprovar ({selectedRecordIds.length})
+                  {selectedRecordIds.length === records.length ? 'Aprovar todos' : `Aprovar (${selectedRecordIds.length})`}
                 </Button>
               </div>
             )}
@@ -305,25 +294,30 @@ export function ApprovalList({
                         Peso Líquido
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => handleOpenRejectDialog(record.id)}
-                        className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <XCircle className="w-4 h-4" />
-                        Rejeitar
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        onClick={() => onApprove(record.id)}
-                        className="gap-1.5"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                        Aprovar
-                      </Button>
-                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="outline" className="gap-1.5">
+                          <MoreHorizontal className="w-4 h-4" />
+                          Ações
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-background border">
+                        <DropdownMenuItem 
+                          onClick={() => onApprove(record.id)}
+                          className="gap-2 cursor-pointer"
+                        >
+                          <CheckCircle className="w-4 h-4 text-primary" />
+                          Aprovar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleOpenRejectDialog(record.id)}
+                          className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          Rejeitar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
                 
