@@ -99,6 +99,14 @@ export function useSyncManager({
         // Continue without photos - don't fail the entire sync
       }
 
+      // Helper to safely convert Date or string to ISO string
+      const toISOString = (value: Date | string | undefined | null): string | null => {
+        if (!value) return null;
+        if (value instanceof Date) return value.toISOString();
+        if (typeof value === 'string') return value;
+        return null;
+      };
+
       const insertData = {
         id: record.id,
         user_id: user.id,
@@ -118,8 +126,8 @@ export function useSyncManager({
         tare_weight: record.tareWeight,
         net_weight: record.netWeight,
         scale_number: record.scaleNumber || null,
-        entry_time: record.entryTime?.toISOString() || null,
-        exit_time: record.exitTime?.toISOString() || null,
+        entry_time: toISOString(record.entryTime),
+        exit_time: toISOString(record.exitTime),
         // Set status based on whether it was created offline
         status: record.createdOffline ? 'pending_approval' : (record.status || 'completed'),
         // Weight method
@@ -130,7 +138,7 @@ export function useSyncManager({
         notes: record.notes || null,
         created_offline: record.createdOffline,
         synced_at: new Date().toISOString(),
-        created_at: record.timestamp.toISOString(),
+        created_at: toISOString(record.timestamp) || new Date().toISOString(),
         photo_urls: photoUrls,
       };
 
