@@ -108,16 +108,29 @@ export function useAuth() {
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    // Limpar estado local mesmo se houver erro (sessão já expirada)
+    // Limpar estado local primeiro
     setSession(null);
     setUser(null);
     setProfile(null);
-    // Ignorar erro "session_not_found" - usuário já está deslogado
-    if (error?.message?.includes('session') || error?.code === 'session_not_found') {
-      return { error: null };
+    
+    // Limpar todos os tokens do Supabase do localStorage
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+        keysToRemove.push(key);
+      }
     }
-    return { error };
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    // Tentar fazer signOut no servidor (pode falhar se sessão já expirou)
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch {
+      // Ignorar erros - o importante é limpar o estado local
+    }
+    
+    return { error: null };
   };
 
   const hasRole = (requiredRole: AppRole | AppRole[]): boolean => {
