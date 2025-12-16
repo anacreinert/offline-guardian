@@ -25,10 +25,11 @@ import { PhotoViewer } from '@/components/PhotoViewer';
 
 interface RecordsListProps {
   records: WeighingRecord[];
-  onRetrySingle: (id: string) => void;
+  onRetrySingle?: (id: string) => void;
   filter: 'all' | 'pending' | 'synced' | 'error';
   onFilterChange: (filter: 'all' | 'pending' | 'synced' | 'error') => void;
   maxRecords?: number;
+  readOnly?: boolean;
 }
 
 const syncStatusConfig: Record<SyncStatus, { icon: typeof Clock; label: string; className: string }> = {
@@ -61,7 +62,7 @@ const filters = [
   { value: 'error', label: 'Com Erro' },
 ] as const;
 
-export function RecordsList({ records, onRetrySingle, filter, onFilterChange, maxRecords }: RecordsListProps) {
+export function RecordsList({ records, onRetrySingle, filter, onFilterChange, maxRecords, readOnly = false }: RecordsListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const filteredRecords = records.filter(record => {
@@ -288,7 +289,7 @@ export function RecordsList({ records, onRetrySingle, filter, onFilterChange, ma
                     </div>
                   )}
 
-                  {(record.syncStatus === 'pending' || record.syncStatus === 'error') && (
+                  {!readOnly && (record.syncStatus === 'pending' || record.syncStatus === 'error') && onRetrySingle && (
                     <div className="mt-4 flex justify-end">
                       <Button
                         size="sm"

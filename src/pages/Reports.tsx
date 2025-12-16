@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FileText, CheckCircle, Clock, ArrowLeft, Calendar, Scale, XCircle } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { FileText, CheckCircle, Clock, ArrowLeft, Calendar, Scale, XCircle, AlertCircle } from 'lucide-react';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,10 @@ import { UserMenu } from '@/components/UserMenu';
 import { ApprovalList } from '@/components/ApprovalList';
 import { DailyReportSummary } from '@/components/DailyReportSummary';
 import { PhotoViewer } from '@/components/PhotoViewer';
+import { SyncErrorManager } from '@/components/SyncErrorManager';
+import { useWeighingRecords } from '@/hooks/useWeighingRecords';
+import { useSyncManager } from '@/hooks/useSyncManager';
+import { useConnectionStatus } from '@/hooks/useConnectionStatus';
 
 interface PhotoUrls {
   vehiclePlate?: string;
@@ -55,8 +59,10 @@ interface DailySummary {
 
 const Reports = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, loading, profile } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { isAuthenticated, loading, profile, user } = useAuth();
   const { toast } = useToast();
+  const { isOnline } = useConnectionStatus();
   
   const [records, setRecords] = useState<WeighingRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -68,6 +74,35 @@ const Reports = () => {
     approvedRecords: 0,
     rejectedRecords: 0,
   });
+
+  // Local records hook for sync error management
+  const { 
+    records: localRecords, 
+    getPendingRecords,
+    updateRecordSyncStatus,
+  } = useWeighingRecords();
+
+  // Get tab from URL params
+  const defaultTab = searchParams.get('tab') || 'pending';
+  
+  // Filter local records with sync errors
+  const syncErrorRecords = localRecords.filter(r => 
+    r.syncStatus === 'error' || r.syncStatus === 'pending'
+  ).map(r => ({
+    id: r.id,
+    vehicle_plate: r.vehiclePlate,
+    driver_name: r.driverName || null,
+    product: r.product || null,
+    gross_weight: r.grossWeight,
+    tare_weight: r.tareWeight,
+    net_weight: r.netWeight,
+    created_at: typeof r.timestamp === 'string' ? r.timestamp : new Date(r.timestamp).toISOString(),
+    photo_urls: r.photoUrls || null,
+    sync_error: r.syncError,
+    sync_attempts: r.syncAttempts,
+    deletion_requested: false,
+    deletion_reason: undefined,
+  }));
 
   // Only gestor/admin roles can access this page
   const isProfileReady = !!profile;
@@ -335,6 +370,112 @@ const Reports = () => {
     }
   };
 
+  // Handler for retrying sync from Reports page
+  const handleRetrySync = async (id: string) => {
+    if (!isOnline) {
+      toast({
+        title: 'Sem conexão',
+        description: 'Você precisa estar online para sincronizar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const record = localRecords.find(r => r.id === id);
+    if (!record) return;
+
+    try {
+      updateRecordSyncStatus(id, 'syncing');
+      
+      // Attempt to sync (simplified - reuses the existing sync logic)
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      // Insert the record
+      const { error } = await supabase.from('weighing_records').insert([{
+        id: record.id,
+        user_id: currentUser.id,
+        vehicle_plate: record.vehiclePlate,
+        driver_name: record.driverName,
+        product: record.product,
+        harvest: record.harvest,
+        supplier: record.supplier,
+        origin: record.origin,
+        destination: record.destination,
+        vehicle_type: record.vehicleType,
+        gross_weight: record.grossWeight,
+        tare_weight: record.tareWeight,
+        net_weight: record.netWeight,
+        notes: record.notes,
+        ticket_number: record.ticketNumber,
+        scale_number: record.scaleNumber,
+        weight_method: record.weightMethod,
+        is_estimated: record.isEstimated,
+        estimated_reason: record.estimatedReason,
+        created_offline: record.createdOffline,
+        created_at: typeof record.timestamp === 'string' ? record.timestamp : new Date(record.timestamp).toISOString(),
+        synced_at: new Date().toISOString(),
+        photo_urls: record.photoUrls ? JSON.parse(JSON.stringify(record.photoUrls)) : {},
+        status: record.createdOffline ? 'pending_approval' : 'completed',
+      }]);
+
+      if (error) throw error;
+
+      updateRecordSyncStatus(id, 'synced');
+      toast({
+        title: 'Sincronizado',
+        description: 'Registro sincronizado com sucesso.',
+      });
+      
+      fetchRecords(); // Refresh database records
+    } catch (error) {
+      console.error('Error syncing record:', error);
+      updateRecordSyncStatus(id, 'error', error instanceof Error ? error.message : 'Erro desconhecido');
+      toast({
+        title: 'Erro ao sincronizar',
+        description: error instanceof Error ? error.message : 'Não foi possível sincronizar o registro.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Handler for requesting deletion
+  const handleRequestDeletion = async (id: string, reason: string) => {
+    try {
+      // Update in database if it exists
+      const { error } = await supabase
+        .from('weighing_records')
+        .update({
+          deletion_requested: true,
+          deletion_reason: reason,
+          deletion_requested_at: new Date().toISOString(),
+          deletion_requested_by: profile?.user_id,
+        })
+        .eq('id', id);
+
+      if (error) {
+        // Record might not be in database yet (local only)
+        console.log('Record not in database, marking locally');
+      }
+
+      toast({
+        title: 'Exclusão solicitada',
+        description: 'A solicitação de exclusão foi enviada para aprovação.',
+      });
+      
+      fetchRecords();
+    } catch (error) {
+      console.error('Error requesting deletion:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível solicitar a exclusão.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (loading || (isAuthenticated && !profile)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -417,19 +558,23 @@ const Reports = () => {
         <DailyReportSummary summary={dailySummary} isLoading={isLoading} />
 
         {/* Tabs */}
-        <Tabs defaultValue="pending" className="mt-8">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
+        <Tabs defaultValue={defaultTab} className="mt-8">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="pending" className="gap-2">
               <Clock className="w-4 h-4" />
-              Pendentes ({pendingApprovalRecords.length})
+              <span className="hidden sm:inline">Pendentes</span> ({pendingApprovalRecords.length})
+            </TabsTrigger>
+            <TabsTrigger value="sync-errors" className="gap-2">
+              <AlertCircle className="w-4 h-4" />
+              <span className="hidden sm:inline">Erros Sync</span> ({syncErrorRecords.length})
             </TabsTrigger>
             <TabsTrigger value="rejected" className="gap-2">
               <XCircle className="w-4 h-4" />
-              Rejeitados ({rejectedRecords.length})
+              <span className="hidden sm:inline">Rejeitados</span> ({rejectedRecords.length})
             </TabsTrigger>
             <TabsTrigger value="all" className="gap-2">
               <Scale className="w-4 h-4" />
-              Todos ({records.length})
+              <span className="hidden sm:inline">Todos</span> ({records.length})
             </TabsTrigger>
           </TabsList>
 
@@ -443,6 +588,15 @@ const Reports = () => {
               onApproveSelected={handleApproveSelected}
               onRejectSelected={handleRejectSelected}
               isLoading={isLoading}
+            />
+          </TabsContent>
+
+          <TabsContent value="sync-errors" className="mt-6">
+            <SyncErrorManager
+              records={syncErrorRecords}
+              onRetrySync={handleRetrySync}
+              onRequestDeletion={handleRequestDeletion}
+              isLoading={false}
             />
           </TabsContent>
 

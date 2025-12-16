@@ -65,6 +65,10 @@ export type Database = {
           approved_by: string | null
           created_at: string
           created_offline: boolean | null
+          deletion_reason: string | null
+          deletion_requested: boolean | null
+          deletion_requested_at: string | null
+          deletion_requested_by: string | null
           destination: string | null
           driver_name: string | null
           entry_time: string | null
@@ -99,6 +103,10 @@ export type Database = {
           approved_by?: string | null
           created_at?: string
           created_offline?: boolean | null
+          deletion_reason?: string | null
+          deletion_requested?: boolean | null
+          deletion_requested_at?: string | null
+          deletion_requested_by?: string | null
           destination?: string | null
           driver_name?: string | null
           entry_time?: string | null
@@ -133,6 +141,10 @@ export type Database = {
           approved_by?: string | null
           created_at?: string
           created_offline?: boolean | null
+          deletion_reason?: string | null
+          deletion_requested?: boolean | null
+          deletion_requested_at?: string | null
+          deletion_requested_by?: string | null
           destination?: string | null
           driver_name?: string | null
           entry_time?: string | null
