@@ -30,6 +30,13 @@ interface ProductOCRResult {
   source: 'offline';
 }
 
+// Debug images for visualization
+export interface OCRDebugImages {
+  original: string;
+  cropped: string;
+  preprocessed: string[];
+}
+
 // Brazilian plate patterns: ABC1234 (old) or ABC1D23 (Mercosul)
 const MERCOSUL_PLATE_REGEX = /^[A-Z]{3}[0-9][A-Z][0-9]{2}$/;
 const OLD_PLATE_REGEX = /^[A-Z]{3}[0-9]{4}$/;
@@ -360,18 +367,31 @@ async function preprocessContrastStretch(imageDataUrl: string): Promise<string> 
 }
 
 // ============================================================================
-// Generate preprocessed images for multi-pass OCR (simplified: 2 instead of 4)
+// Generate preprocessed images for multi-pass OCR (with debug info)
 // ============================================================================
-async function multiPassPreprocess(imageDataUrl: string): Promise<string[]> {
+interface PreprocessResult {
+  images: string[];
+  debug: OCRDebugImages;
+}
+
+async function multiPassPreprocess(imageDataUrl: string): Promise<PreprocessResult> {
   // First, detect and crop the plate region
   const croppedImage = await detectPlateByContrast(imageDataUrl);
   console.log('[OCR] ROI detection complete, running preprocessing...');
   
-  const results = await Promise.all([
+  const preprocessed = await Promise.all([
     preprocessOtsu(croppedImage),
     preprocessContrastStretch(croppedImage),
   ]);
-  return results;
+  
+  return {
+    images: preprocessed,
+    debug: {
+      original: imageDataUrl,
+      cropped: croppedImage,
+      preprocessed: preprocessed,
+    }
+  };
 }
 
 // ============================================================================
@@ -830,17 +850,20 @@ export function useOfflineOCR() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [debugImages, setDebugImages] = useState<OCRDebugImages | null>(null);
 
   const recognizePlate = useCallback(async (imageDataUrl: string): Promise<PlateOCRResult | null> => {
     setIsProcessing(true);
     setError(null);
     setProgress(0);
+    setDebugImages(null);
 
     try {
       console.log('[Offline OCR] Starting simplified plate recognition (4 passes)...');
 
       // Generate 2 preprocessed versions (down from 4)
-      const processedImages = await multiPassPreprocess(imageDataUrl);
+      const { images: processedImages, debug } = await multiPassPreprocess(imageDataUrl);
+      setDebugImages(debug);
       setProgress(20);
 
       // Use 2 configs (down from 3)
@@ -1024,6 +1047,7 @@ export function useOfflineOCR() {
     isProcessing,
     error,
     progress,
+    debugImages,
     recognizePlate,
     recognizeWeight,
     recognizeBothWeights,

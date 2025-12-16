@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Camera, X, Loader2, ScanLine, Wifi, WifiOff } from 'lucide-react';
+import { Camera, X, Loader2, ScanLine, Wifi, WifiOff, Bug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useCamera } from '@/hooks/useCamera';
@@ -7,6 +7,7 @@ import { useHybridOCR } from '@/hooks/useHybridOCR';
 import { PhotoData, PhotoCategory } from '@/types/weighing';
 import { toast } from 'sonner';
 import { OCRConfirmationDialog } from '@/components/OCRConfirmationDialog';
+import { OCRDebugViewer } from '@/components/OCRDebugViewer';
 
 interface OCRResult {
   type: 'plate' | 'weights' | 'product';
@@ -43,11 +44,13 @@ export function CategoryPhotoCapture({
   isOnline
 }: CategoryPhotoCaptureProps) {
   const { isCapturing, error, takePhoto } = useCamera();
-  const { isProcessing, progress, lastSource, recognizePlate, recognizeBothWeights, recognizeProduct } = useHybridOCR({ isOnline });
+  const { isProcessing, progress, lastSource, debugImages, recognizePlate, recognizeBothWeights, recognizeProduct } = useHybridOCR({ isOnline });
   
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showDebugViewer, setShowDebugViewer] = useState(false);
   const [pendingOCR, setPendingOCR] = useState<OCRResult | null>(null);
   const [ocrSource, setOcrSource] = useState<'online' | 'offline' | null>(null);
+  const [lastOCRResult, setLastOCRResult] = useState<string | null>(null);
 
   const handleTakePhoto = async () => {
     const captured = await takePhoto();
@@ -68,6 +71,7 @@ export function CategoryPhotoCapture({
         const result = await recognizePlate(captured.dataUrl);
         
         setOcrSource(result?.source || null);
+        setLastOCRResult(result?.plate || null);
         // Show confirmation dialog instead of auto-filling
         setPendingOCR({
           type: 'plate',
@@ -213,6 +217,20 @@ export function CategoryPhotoCapture({
             )}
           </Button>
         )}
+        
+        {/* Debug button - only show for plate category when we have debug images */}
+        {category === 'vehiclePlate' && debugImages && !isProcessing && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowDebugViewer(true)}
+            className="h-8 w-8 flex-shrink-0"
+            title="Ver debug do OCR"
+          >
+            <Bug className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        )}
       </div>
 
       {/* Progress bar for offline OCR */}
@@ -234,6 +252,14 @@ export function CategoryPhotoCapture({
           onReject={handleRejectOCR}
         />
       )}
+
+      {/* Debug Viewer */}
+      <OCRDebugViewer
+        open={showDebugViewer}
+        onOpenChange={setShowDebugViewer}
+        debugImages={debugImages}
+        ocrResult={lastOCRResult}
+      />
     </>
   );
 }
