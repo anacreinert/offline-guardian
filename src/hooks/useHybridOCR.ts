@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useOCR } from './useOCR';
-import { useOfflineOCR } from './useOfflineOCR';
+import { useOfflineOCR, OCRDebugImages } from './useOfflineOCR';
 
 interface PlateOCRResult {
   plate: string | null;
@@ -43,6 +43,7 @@ export function useHybridOCR({ isOnline }: UseHybridOCROptions) {
   const isProcessing = onlineOCR.isProcessing || offlineOCR.isProcessing;
   const error = onlineOCR.error || offlineOCR.error;
   const progress = offlineOCR.progress;
+  const debugImages: OCRDebugImages | null = offlineOCR.debugImages;
 
   const recognizePlate = useCallback(async (imageDataUrl: string): Promise<PlateOCRResult | null> => {
     // Try online first if connected
@@ -142,6 +143,7 @@ export function useHybridOCR({ isOnline }: UseHybridOCROptions) {
     progress,
     lastSource,
     isOnline,
+    debugImages,
     recognizePlate,
     recognizeWeight,
     recognizeBothWeights,
