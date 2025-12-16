@@ -116,7 +116,6 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
   const [vehiclePlatePhoto, setVehiclePlatePhoto] = useState<PhotoData | null>(null);
   const [tarePhoto, setTarePhoto] = useState<PhotoData | null>(null);
   const [productPhoto, setProductPhoto] = useState<PhotoData | null>(null);
-  const [grossDisplayPhoto, setGrossDisplayPhoto] = useState<PhotoData | null>(null);
   const [tareDisplayPhoto, setTareDisplayPhoto] = useState<PhotoData | null>(null);
   
   const [weightMethod, setWeightMethod] = useState<WeightMethod>('scale');
@@ -258,7 +257,6 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
       vehiclePlatePhoto,
       tarePhoto,
       productPhoto,
-      grossDisplayPhoto,
       tareDisplayPhoto,
     ].filter((p): p is PhotoData => p !== null);
 
@@ -313,7 +311,6 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
     setVehiclePlatePhoto(null);
     setTarePhoto(null);
     setProductPhoto(null);
-    setGrossDisplayPhoto(null);
     setTareDisplayPhoto(null);
     setWeightMethod('scale');
 
@@ -642,7 +639,7 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
           </div>
         )}
 
-        {/* Display OCR Mode - Photo Buttons */}
+        {/* Display OCR Mode - Single Photo */}
         {weightMethod === 'display_ocr' && (
           <div className="p-4 rounded-xl border-2 border-blue-500/30 bg-blue-500/5">
             <div className="flex items-start gap-3 mb-4">
@@ -650,40 +647,26 @@ export function WeighingForm({ isOffline, onSubmit }: WeighingFormProps) {
               <div className="flex-1">
                 <p className="font-semibold text-blue-500">MODO FOTO DO DISPLAY</p>
                 <p className="text-sm text-muted-foreground">
-                  Tire fotos do display da balança para reconhecimento automático via OCR.
+                  Tire uma foto do display da balança para reconhecimento automático do peso bruto e tara via OCR.
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Scale className="w-4 h-4" />
-                  Foto Peso Bruto (Entrada)
-                </Label>
-                <CategoryPhotoCapture
-                  category="tare"
-                  photo={grossDisplayPhoto}
-                  onPhotoChange={setGrossDisplayPhoto}
-                  onWeightRecognized={handleGrossRecognized}
-                  label="peso bruto"
-                  isOnline={!isOffline}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Scale className="w-4 h-4" />
-                  Foto Tara (Saída)
-                </Label>
-                <CategoryPhotoCapture
-                  category="tare"
-                  photo={tareDisplayPhoto}
-                  onPhotoChange={setTareDisplayPhoto}
-                  onWeightRecognized={handleTareRecognized}
-                  onBothWeightsRecognized={handleBothWeightsRecognized}
-                  label="tara"
-                  isOnline={!isOffline}
-                />
-              </div>
+            <div className="flex flex-col items-center space-y-3">
+              <Label className="flex items-center gap-2">
+                <Scale className="w-4 h-4" />
+                Foto do Display da Balança
+              </Label>
+              <p className="text-xs text-muted-foreground text-center">
+                O OCR irá extrair automaticamente o peso bruto e a tara
+              </p>
+              <CategoryPhotoCapture
+                category="tare"
+                photo={tareDisplayPhoto}
+                onPhotoChange={setTareDisplayPhoto}
+                onBothWeightsRecognized={handleBothWeightsRecognized}
+                label="display da balança"
+                isOnline={!isOffline}
+              />
             </div>
           </div>
         )}
