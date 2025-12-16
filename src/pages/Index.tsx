@@ -139,17 +139,10 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Main Content - Form first, then Records */}
+        {/* Main Content */}
         <div className="space-y-8">
-          {/* Form - Hidden for Admin */}
-          {!isAdmin && (
-            <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
-              <WeighingForm isOffline={isOffline} onSubmit={handleSubmit} />
-            </div>
-          )}
-
-          {/* Metrics */}
-          <div className="animate-fade-in" style={{ animationDelay: '250ms' }}>
+          {/* Metrics - Always first */}
+          <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
             <MetricsCards
               totalRecordsToday={todayRecords.length}
               offlineRecordsToday={offlineRecordsToday}
@@ -159,6 +152,13 @@ const Index = () => {
               records={records}
             />
           </div>
+
+          {/* Form - Hidden for Admin */}
+          {!isAdmin && (
+            <div className="animate-fade-in" style={{ animationDelay: '250ms' }}>
+              <WeighingForm isOffline={isOffline} onSubmit={handleSubmit} />
+            </div>
+          )}
 
           {/* Records List - Always below */}
           <div className="animate-fade-in" style={{ animationDelay: '300ms' }}>
