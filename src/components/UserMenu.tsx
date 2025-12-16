@@ -40,6 +40,8 @@ export function UserMenu() {
     } catch {
       // Ignora erros - o importante é redirecionar
     }
+    // Limpar dados locais do usuário
+    localStorage.removeItem('weighing_records');
     setIsLoggingOut(false);
     navigate('/auth');
   };
