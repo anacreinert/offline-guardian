@@ -109,8 +109,13 @@ export function useAuth() {
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
-    if (!error) {
-      setProfile(null);
+    // Limpar estado local mesmo se houver erro (sessão já expirada)
+    setSession(null);
+    setUser(null);
+    setProfile(null);
+    // Ignorar erro "session_not_found" - usuário já está deslogado
+    if (error?.message?.includes('session') || error?.code === 'session_not_found') {
+      return { error: null };
     }
     return { error };
   };
