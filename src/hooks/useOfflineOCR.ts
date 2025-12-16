@@ -40,33 +40,31 @@ const FILTER_WORDS = ['BRASIL', 'BRAZIL', 'MERCOSUL', 'MERCOSUR', 'BR'];
 // Positional character corrections for plates
 // Position 0-2: ALWAYS letters
 const LETTER_CORRECTIONS: Record<string, string> = {
-  '0': 'O', '1': 'I', '2': 'Z', '4': 'A', '5': 'S', '6': 'G', '8': 'B', '9': 'G',
+  '0': 'O', '1': 'I', '2': 'Z', '3': 'E', '4': 'A', '5': 'S', '6': 'G', '8': 'B', '9': 'G',
 };
 
 // Position 3, 5, 6: ALWAYS numbers
 const NUMBER_CORRECTIONS: Record<string, string> = {
-  'O': '0', 'o': '0', 'Q': '0', 'D': '0',
-  'I': '1', 'i': '1', 'l': '1', 'L': '1', '|': '1',
+  'O': '0', 'o': '0', 'Q': '0', 'D': '0', 'C': '0',
+  'I': '1', 'i': '1', 'l': '1', 'L': '1', '|': '1', 'J': '1',
   'Z': '2', 'z': '2',
-  'E': '3',
-  'A': '4', 'h': '4',
+  'E': '3', 'F': '3',
+  'A': '4', 'h': '4', 'H': '4',
   'S': '5', 's': '5',
   'G': '6', 'b': '6',
-  'T': '7',
+  'T': '7', 'Y': '7',
   'B': '8',
-  'g': '9', 'q': '9',
+  'g': '9', 'q': '9', 'P': '9',
 };
 
-// Specific corrections for commonly confused characters
-const SPECIFIC_LETTER_CORRECTIONS: Record<string, string> = {
-  'R': 'R', 'P': 'P', 'B': 'B', // R can be confused with P or B
-  '0': 'O', 'D': 'D', 'Q': 'Q', // 0 → O in letter positions
-  '1': 'I', 'L': 'I',           // 1/L → I in letter positions
-  '8': 'B',                      // 8 → B in letter positions
-  '5': 'S',                      // 5 → S in letter positions
-  '6': 'G',                      // 6 → G in letter positions
-  '2': 'Z',                      // 2 → Z in letter positions
-  '4': 'A',                      // 4 → A in letter positions
+// Enhanced corrections for FE-Font (Mercosul) - E is often misread
+const FE_FONT_LETTER_CORRECTIONS: Record<string, string[]> = {
+  'E': ['R', 'B', 'E', 'F'],  // E is commonly misread from R, B
+  'F': ['R', 'F', 'P'],       // F can be misread from R, P
+  '3': ['E', 'B'],            // 3 can be confused with E
+  '8': ['B', 'R'],            // 8 can be confused with B
+  'P': ['R', 'P'],            // P can be confused with R
+  'B': ['R', 'B', '8'],       // B can be confused with R
 };
 
 // Detect and crop the plate region (ROI) - isolate white area, ignore blue strip
@@ -172,23 +170,54 @@ async function preprocessMercosul(imageDataUrl: string): Promise<string> {
         return;
       }
 
-      const scale = 4; // Higher scale for better character recognition
+      const scale = 3; // Reduced scale for better character shape preservation
       canvas.width = img.width * scale;
       canvas.height = img.height * scale;
 
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
+      ctx.imageSmoothingEnabled = false; // Disable smoothing for sharper edges
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
 
-      // Convert to grayscale and apply aggressive threshold for white background
+      // Calculate optimal threshold using Otsu's method
+      const histogram: number[] = new Array(256).fill(0);
       for (let i = 0; i < data.length; i += 4) {
         const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-        // Use threshold optimized for black text on white background
-        // Characters (dark) become black, background (light) becomes white
-        const val = gray < 140 ? 0 : 255;
+        histogram[gray]++;
+      }
+
+      let totalPixels = data.length / 4;
+      let sum = 0;
+      for (let i = 0; i < 256; i++) sum += i * histogram[i];
+
+      let sumB = 0, wB = 0, wF = 0;
+      let maxVariance = 0, threshold = 128;
+
+      for (let t = 0; t < 256; t++) {
+        wB += histogram[t];
+        if (wB === 0) continue;
+        wF = totalPixels - wB;
+        if (wF === 0) break;
+
+        sumB += t * histogram[t];
+        const mB = sumB / wB;
+        const mF = (sum - sumB) / wF;
+        const variance = wB * wF * (mB - mF) * (mB - mF);
+
+        if (variance > maxVariance) {
+          maxVariance = variance;
+          threshold = t;
+        }
+      }
+
+      // Apply threshold with slight adjustment for darker text
+      const adjustedThreshold = Math.max(100, threshold - 20);
+      console.log(`[Mercosul] Using threshold: ${adjustedThreshold} (Otsu: ${threshold})`);
+
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+        const val = gray < adjustedThreshold ? 0 : 255;
         data[i] = val;
         data[i + 1] = val;
         data[i + 2] = val;
@@ -200,7 +229,7 @@ async function preprocessMercosul(imageDataUrl: string): Promise<string> {
       // Add padding
       const paddedCanvas = document.createElement('canvas');
       const paddedCtx = paddedCanvas.getContext('2d')!;
-      const padding = 30;
+      const padding = 40;
       paddedCanvas.width = canvas.width + padding * 2;
       paddedCanvas.height = canvas.height + padding * 2;
       paddedCtx.fillStyle = 'white';
@@ -420,6 +449,9 @@ function applyPositionalCorrections(text: string): string {
     const char = cleaned[i];
     if (/[0-9]/.test(char)) {
       result += LETTER_CORRECTIONS[char] || char;
+    } else if (char === 'E') {
+      // E is commonly misread in FE-Font - try to preserve but note it
+      result += char;
     } else {
       result += char;
     }
@@ -434,7 +466,6 @@ function applyPositionalCorrections(text: string): string {
   }
 
   // Position 4: Letter for Mercosul, Number for old format
-  // Try to determine which format based on context
   const pos4 = cleaned[4];
   const pos5 = cleaned[5];
   const pos6 = cleaned[6];
@@ -467,6 +498,95 @@ function applyPositionalCorrections(text: string): string {
   }
 
   return result;
+}
+
+// Try to generate plate variants for when OCR result is clearly wrong (like EEE3E33)
+function generatePlateVariants(text: string): string[] {
+  const cleaned = text.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  if (cleaned.length !== 7) return [cleaned];
+
+  // Common FE-Font misreads with priority order (most likely first)
+  const feReplacements: Record<string, string[]> = {
+    'E': ['R', 'I', 'O', 'B', 'A'],  // Prioritize most common
+    '3': ['2', '1', '8', 'A', 'E'],  // 3 often misread from these
+    'F': ['R', 'P'],
+    '8': ['B', '0'],
+    'B': ['R', '8'],
+    'P': ['R', 'B'],
+    '0': ['O', 'D'],
+    '1': ['I', 'L'],
+    '6': ['G'],
+    '5': ['S'],
+    '2': ['Z'],
+    '4': ['A'],
+    '7': ['1', 'T'],
+    '9': ['G', 'Q'],
+  };
+
+  const validVariants: string[] = [];
+  const MAX_VARIANTS = 50;
+  
+  // Generate variants using iterative approach with early pruning
+  function tryGenerate(pos: number, current: string): void {
+    if (validVariants.length >= MAX_VARIANTS) return;
+    
+    if (pos >= 7) {
+      // Validate the complete plate
+      if (MERCOSUL_PLATE_REGEX.test(current) || OLD_PLATE_REGEX.test(current)) {
+        if (!validVariants.includes(current)) {
+          validVariants.push(current);
+        }
+      }
+      return;
+    }
+
+    const char = cleaned[pos];
+    const replacements = [char, ...(feReplacements[char] || [])];
+    
+    for (const rep of replacements) {
+      if (validVariants.length >= MAX_VARIANTS) return;
+      
+      let validChar = rep;
+      
+      // Apply position-specific rules
+      if (pos < 3) {
+        // Must be letter
+        if (/[0-9]/.test(rep)) {
+          validChar = LETTER_CORRECTIONS[rep] || rep;
+        }
+        if (!/[A-Z]/.test(validChar)) continue;
+      } else if (pos === 3) {
+        // Must be number
+        if (/[A-Z]/.test(rep)) {
+          validChar = NUMBER_CORRECTIONS[rep] || rep;
+        }
+        if (!/[0-9]/.test(validChar)) continue;
+      } else if (pos === 4) {
+        // Can be letter (Mercosul) or number (old format)
+        // Try both paths
+        if (/[A-Z]/.test(rep)) {
+          tryGenerate(pos + 1, current + rep);
+          // Also try as number for old format
+          const numChar = NUMBER_CORRECTIONS[rep];
+          if (numChar) tryGenerate(pos + 1, current + numChar);
+          continue;
+        }
+      } else if (pos === 5 || pos === 6) {
+        // Must be number
+        if (/[A-Z]/.test(rep)) {
+          validChar = NUMBER_CORRECTIONS[rep] || rep;
+        }
+        if (!/[0-9]/.test(validChar)) continue;
+      }
+      
+      tryGenerate(pos + 1, current + validChar);
+    }
+  }
+
+  tryGenerate(0, '');
+  
+  console.log(`[OCR] Generated ${validVariants.length} valid variants from "${cleaned}"`);
+  return validVariants;
 }
 
 // Filter out unwanted text (BRASIL, MERCOSUL, etc.)
@@ -535,34 +655,41 @@ function findBestPlateMatch(texts: string[]): string | null {
     const potentialPlates = extractPlateCandidates(text);
     
     for (const rawPlate of potentialPlates) {
+      // First try standard correction
       const corrected = applyPositionalCorrections(rawPlate);
       
-      let score = 0;
+      // Also generate variants for FE-Font misreads
+      const variants = generatePlateVariants(rawPlate);
+      const allPlates = [corrected, ...variants];
       
-      // Perfect Mercosul format gets highest score
-      if (MERCOSUL_PLATE_REGEX.test(corrected)) {
-        score = 100;
-      } else if (OLD_PLATE_REGEX.test(corrected)) {
-        score = 95;
-      } else if (corrected.length === 7) {
-        // Partial match - check how many positions are valid
-        const letters = corrected.substring(0, 3);
-        const hasValidLetters = /^[A-Z]{3}$/.test(letters);
-        const pos3Valid = /[0-9]/.test(corrected[3]);
+      for (const plate of [...new Set(allPlates)]) {
+        let score = 0;
         
-        if (hasValidLetters) score += 40;
-        if (pos3Valid) score += 20;
-        
-        // Check if it looks like a plate (mix of letters and numbers)
-        const letterCount = (corrected.match(/[A-Z]/g) || []).length;
-        const numberCount = (corrected.match(/[0-9]/g) || []).length;
-        if (letterCount >= 3 && letterCount <= 4 && numberCount >= 3) {
-          score += 20;
+        // Perfect Mercosul format gets highest score
+        if (MERCOSUL_PLATE_REGEX.test(plate)) {
+          score = 100;
+        } else if (OLD_PLATE_REGEX.test(plate)) {
+          score = 95;
+        } else if (plate.length === 7) {
+          // Partial match - check how many positions are valid
+          const letters = plate.substring(0, 3);
+          const hasValidLetters = /^[A-Z]{3}$/.test(letters);
+          const pos3Valid = /[0-9]/.test(plate[3]);
+          
+          if (hasValidLetters) score += 40;
+          if (pos3Valid) score += 20;
+          
+          // Check if it looks like a plate (mix of letters and numbers)
+          const letterCount = (plate.match(/[A-Z]/g) || []).length;
+          const numberCount = (plate.match(/[0-9]/g) || []).length;
+          if (letterCount >= 3 && letterCount <= 4 && numberCount >= 3) {
+            score += 20;
+          }
         }
-      }
-      
-      if (score > 0) {
-        candidates.push({ plate: corrected, score, original: rawPlate });
+        
+        if (score > 0) {
+          candidates.push({ plate, score, original: rawPlate });
+        }
       }
     }
   }
@@ -582,11 +709,19 @@ function findBestPlateMatch(texts: string[]): string | null {
     return scoreB - scoreA;
   });
 
-  console.log('[OCR] Top candidates:', candidates.slice(0, 5).map(c => 
+  // Filter to only valid plates (score >= 95)
+  const validPlates = candidates.filter(c => c.score >= 95);
+  
+  console.log('[OCR] Top candidates:', candidates.slice(0, 10).map(c => 
     `${c.plate} (score: ${c.score}, count: ${plateCounts[c.plate]}, orig: ${c.original})`
   ));
+  
+  if (validPlates.length > 0) {
+    console.log('[OCR] Valid plates found:', validPlates.slice(0, 5).map(c => c.plate));
+    return validPlates[0].plate;
+  }
 
-  return candidates[0].plate;
+  return candidates[0]?.plate || null;
 }
 
 // Tesseract configurations optimized for plates
