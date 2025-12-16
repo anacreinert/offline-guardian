@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, Shield, Search, RefreshCw, Plus, Trash2, UserPlus } from 'lucide-react';
+import { ArrowLeft, Users, Shield, Search, RefreshCw, Trash2, UserPlus, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -86,6 +86,12 @@ const UserManagement = () => {
     fullName: '',
     role: 'operador' as AppRole,
   });
+
+  // Reset password form
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetUserData, setResetUserData] = useState<{ userId: string; fullName: string } | null>(null);
+  const [newPassword, setNewPassword] = useState('');
 
   const isAdmin = profile?.role === 'admin';
 
@@ -306,6 +312,63 @@ const UserManagement = () => {
     }
   };
 
+  const openResetPasswordDialog = (user: UserWithRole) => {
+    setResetUserData({ userId: user.user_id, fullName: user.full_name });
+    setNewPassword('');
+    setIsResetDialogOpen(true);
+  };
+
+  const resetPassword = async () => {
+    if (!resetUserData?.userId || !newPassword) {
+      toast({
+        title: 'Campos obrigatórios',
+        description: 'Digite a nova senha.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: 'Senha muito curta',
+        description: 'A senha deve ter pelo menos 6 caracteres.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('reset-password', {
+        body: {
+          userId: resetUserData.userId,
+          newPassword,
+        },
+      });
+
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: 'Senha alterada',
+        description: `A senha de ${resetUserData.fullName} foi atualizada com sucesso.`,
+      });
+
+      setIsResetDialogOpen(false);
+      setResetUserData(null);
+      setNewPassword('');
+    } catch (error: any) {
+      console.error('Error resetting password:', error);
+      toast({
+        title: 'Erro ao alterar senha',
+        description: error.message || 'Não foi possível alterar a senha.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -505,36 +568,47 @@ const UserManagement = () => {
                           </Select>
                         </TableCell>
                         <TableCell className="text-right">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                disabled={user.user_id === profile?.user_id || deletingUserId === user.user_id}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Você está prestes a excluir <strong>{user.full_name}</strong> do sistema. 
-                                  Esta ação não pode ser desfeita.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => deleteUser(user.user_id, user.full_name)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openResetPasswordDialog(user)}
+                              title="Alterar senha"
+                            >
+                              <KeyRound className="w-4 h-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  disabled={user.user_id === profile?.user_id || deletingUserId === user.user_id}
+                                  title="Excluir usuário"
                                 >
-                                  Excluir
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Você está prestes a excluir <strong>{user.full_name}</strong> do sistema. 
+                                    Esta ação não pode ser desfeita.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteUser(user.user_id, user.full_name)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Excluir
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -544,6 +618,38 @@ const UserManagement = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Reset Password Dialog */}
+        <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Alterar Senha</DialogTitle>
+              <DialogDescription>
+                Digite a nova senha para <strong>{resetUserData?.fullName}</strong>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">Nova Senha *</Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsResetDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={resetPassword} disabled={isResetting}>
+                {isResetting ? 'Alterando...' : 'Alterar Senha'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
