@@ -56,10 +56,10 @@ const NUMBER_CORRECTIONS: Record<string, string> = {
 };
 
 // ============================================================================
-// SIMPLIFIED PLATE DETECTION - Uses contrast instead of white detection
+// PLATE DETECTION - Focus on finding white rectangular region with dark text
 // ============================================================================
 
-// Detect plate region by finding high-contrast rectangular areas
+// Detect plate by finding the white rectangular character area
 async function detectPlateByContrast(imageDataUrl: string): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -81,108 +81,113 @@ async function detectPlateByContrast(imageDataUrl: string): Promise<string> {
       const width = canvas.width;
       const height = canvas.height;
 
-      // Calculate grayscale and find regions with high local contrast
-      const grayscale: number[] = [];
-      for (let i = 0; i < data.length; i += 4) {
-        grayscale.push(Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]));
-      }
-
-      // Calculate local contrast for each row (sliding window)
-      const rowContrast: number[] = [];
-      const windowSize = Math.floor(width * 0.1);
+      // Analyze each row for: brightness (white area) AND contrast (has characters)
+      const rowScores: { brightness: number; contrast: number; whiteRatio: number }[] = [];
       
       for (let y = 0; y < height; y++) {
-        let maxContrast = 0;
-        for (let x = 0; x < width - windowSize; x++) {
-          let min = 255, max = 0;
-          for (let wx = 0; wx < windowSize; wx++) {
-            const val = grayscale[y * width + x + wx];
-            if (val < min) min = val;
-            if (val > max) max = val;
-          }
-          const contrast = max - min;
-          if (contrast > maxContrast) maxContrast = contrast;
+        let sumBrightness = 0;
+        let minBrightness = 255, maxBrightness = 0;
+        let whitePixels = 0;
+        
+        for (let x = 0; x < width; x++) {
+          const idx = (y * width + x) * 4;
+          const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+          const brightness = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+          
+          sumBrightness += brightness;
+          if (brightness < minBrightness) minBrightness = brightness;
+          if (brightness > maxBrightness) maxBrightness = brightness;
+          
+          // Count white/light pixels (plate background)
+          if (brightness > 180) whitePixels++;
         }
-        rowContrast.push(maxContrast);
+        
+        rowScores.push({
+          brightness: sumBrightness / width,
+          contrast: maxBrightness - minBrightness,
+          whiteRatio: whitePixels / width,
+        });
       }
 
-      // Find the region with highest sustained contrast (likely the plate)
-      const contrastThreshold = 60; // Minimum contrast to consider
-      let topCrop = 0;
-      let bottomCrop = height;
-      let foundRegion = false;
-
-      // Find start of high-contrast region
+      // Find rows that are: bright (white background) + high contrast (has characters)
+      // This identifies the white character area of the plate
+      let topCrop = 0, bottomCrop = height;
+      let foundPlateArea = false;
+      
+      // Look for rows with: whiteRatio > 0.3 AND contrast > 100 (dark chars on white)
       for (let y = 0; y < height; y++) {
-        if (rowContrast[y] > contrastThreshold) {
-          topCrop = Math.max(0, y - 10);
-          foundRegion = true;
+        const score = rowScores[y];
+        if (score.whiteRatio > 0.25 && score.contrast > 80) {
+          topCrop = Math.max(0, y - 5);
+          foundPlateArea = true;
           break;
         }
       }
-
-      // Find end of high-contrast region
-      if (foundRegion) {
+      
+      if (foundPlateArea) {
         for (let y = height - 1; y > topCrop; y--) {
-          if (rowContrast[y] > contrastThreshold) {
-            bottomCrop = Math.min(height, y + 10);
+          const score = rowScores[y];
+          if (score.whiteRatio > 0.25 && score.contrast > 80) {
+            bottomCrop = Math.min(height, y + 5);
             break;
           }
         }
       }
 
-      // Calculate horizontal bounds by column contrast
-      const colContrast: number[] = [];
-      const vertWindowSize = Math.floor((bottomCrop - topCrop) * 0.3);
+      // Find horizontal bounds using same approach
+      const colScores: { whiteRatio: number; contrast: number }[] = [];
       
       for (let x = 0; x < width; x++) {
-        let maxContrast = 0;
-        for (let y = topCrop; y < bottomCrop - vertWindowSize; y++) {
-          let min = 255, max = 0;
-          for (let wy = 0; wy < vertWindowSize; wy++) {
-            const val = grayscale[(y + wy) * width + x];
-            if (val < min) min = val;
-            if (val > max) max = val;
-          }
-          const contrast = max - min;
-          if (contrast > maxContrast) maxContrast = contrast;
+        let whitePixels = 0;
+        let minB = 255, maxB = 0;
+        
+        for (let y = topCrop; y < bottomCrop; y++) {
+          const idx = (y * width + x) * 4;
+          const brightness = Math.round(0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2]);
+          if (brightness > 180) whitePixels++;
+          if (brightness < minB) minB = brightness;
+          if (brightness > maxB) maxB = brightness;
         }
-        colContrast.push(maxContrast);
+        
+        const regionHeight = bottomCrop - topCrop || 1;
+        colScores.push({
+          whiteRatio: whitePixels / regionHeight,
+          contrast: maxB - minB,
+        });
       }
 
-      let leftCrop = 0;
-      let rightCrop = width;
-
+      let leftCrop = 0, rightCrop = width;
+      
       for (let x = 0; x < width; x++) {
-        if (colContrast[x] > contrastThreshold) {
-          leftCrop = Math.max(0, x - 10);
+        if (colScores[x].whiteRatio > 0.3 && colScores[x].contrast > 60) {
+          leftCrop = Math.max(0, x - 5);
           break;
         }
       }
-
+      
       for (let x = width - 1; x > leftCrop; x--) {
-        if (colContrast[x] > contrastThreshold) {
-          rightCrop = Math.min(width, x + 10);
+        if (colScores[x].whiteRatio > 0.3 && colScores[x].contrast > 60) {
+          rightCrop = Math.min(width, x + 5);
           break;
         }
       }
 
-      // Validate crop dimensions (plate aspect ratio ~2:1 to ~3:1)
       const cropHeight = bottomCrop - topCrop;
       const cropWidth = rightCrop - leftCrop;
-      const aspectRatio = cropWidth / cropHeight;
+      const aspectRatio = cropWidth / Math.max(cropHeight, 1);
 
-      if (cropHeight > height * 0.1 && cropWidth > width * 0.2 && aspectRatio >= 1.5 && aspectRatio <= 5) {
+      // Valid plate area: decent size and reasonable aspect ratio
+      if (foundPlateArea && cropHeight > height * 0.1 && cropWidth > width * 0.15 && aspectRatio >= 1.5 && aspectRatio <= 6) {
         const croppedCanvas = document.createElement('canvas');
         const croppedCtx = croppedCanvas.getContext('2d')!;
         
-        // Add padding
-        const padding = 15;
+        // Add generous padding
+        const padding = 20;
         croppedCanvas.width = cropWidth + padding * 2;
         croppedCanvas.height = cropHeight + padding * 2;
         
-        // Fill with median color (better than white for varied backgrounds)
-        croppedCtx.fillStyle = '#888888';
+        // White background for padding (matches plate)
+        croppedCtx.fillStyle = 'white';
         croppedCtx.fillRect(0, 0, croppedCanvas.width, croppedCanvas.height);
         
         croppedCtx.drawImage(
@@ -191,10 +196,10 @@ async function detectPlateByContrast(imageDataUrl: string): Promise<string> {
           padding, padding, cropWidth, cropHeight
         );
         
-        console.log(`[ROI-Contrast] Cropped to ${cropWidth}x${cropHeight}, aspect=${aspectRatio.toFixed(2)}`);
+        console.log(`[ROI] Found plate area: ${cropWidth}x${cropHeight}, aspect=${aspectRatio.toFixed(2)}, top=${topCrop}, bottom=${bottomCrop}`);
         resolve(croppedCanvas.toDataURL('image/png'));
       } else {
-        console.log('[ROI-Contrast] No valid region found, using full image');
+        console.log(`[ROI] No valid plate area found (h=${cropHeight}, w=${cropWidth}, ar=${aspectRatio.toFixed(2)}), using full image`);
         resolve(imageDataUrl);
       }
     };
