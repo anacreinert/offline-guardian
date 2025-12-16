@@ -23,6 +23,7 @@ export function useSyncManager({
   isOnline,
 }: SyncManagerOptions) {
   const isSyncing = useRef(false);
+  const syncingRecordIds = useRef<Set<string>>(new Set());
 
   // Upload photos to storage and return URLs
   const uploadPhotos = async (record: WeighingRecord, userId: string): Promise<Record<string, string>> => {
@@ -176,6 +177,13 @@ export function useSyncManager({
   };
 
   const syncRecord = useCallback(async (record: WeighingRecord): Promise<{ success: boolean; error?: string }> => {
+    // Prevent duplicate syncs of the same record
+    if (syncingRecordIds.current.has(record.id)) {
+      console.log('[SYNC] Registro já está sincronizando:', record.id);
+      return { success: false, error: 'Já está sincronizando' };
+    }
+    
+    syncingRecordIds.current.add(record.id);
     updateRecordSyncStatus(record.id, 'syncing');
     
     try {
@@ -192,21 +200,26 @@ export function useSyncManager({
       const errorMsg = err?.message || 'Erro desconhecido';
       updateRecordSyncStatus(record.id, 'error', errorMsg);
       return { success: false, error: errorMsg };
+    } finally {
+      syncingRecordIds.current.delete(record.id);
     }
   }, [updateRecordSyncStatus]);
 
   const syncAll = useCallback(async () => {
-    if (isSyncing.current || !isOnline) {
-      if (!isOnline) {
-        toast.error('Sem conexão com a rede');
-      }
+    if (isSyncing.current) {
+      console.log('[SYNC] Sincronização já em andamento');
+      return;
+    }
+    
+    if (!isOnline) {
+      toast.error('Sem conexão com a rede');
       return;
     }
 
     const pendingRecords = getPendingRecords();
     
-    // Sync all pending records (including offline - they go with pending_approval status)
-    const recordsToSync = pendingRecords;
+    // Filter out records that are already syncing
+    const recordsToSync = pendingRecords.filter(r => !syncingRecordIds.current.has(r.id));
     
     if (recordsToSync.length === 0) {
       toast.info('Nenhum registro pendente para sincronizar');
