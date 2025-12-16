@@ -35,18 +35,13 @@ export function UserMenu() {
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    // Navegar primeiro para evitar condição de corrida com o useEffect de redirecionamento
-    navigate('/auth');
-    const { error } = await signOut();
-    
-    if (error) {
-      toast({
-        title: 'Erro ao sair',
-        description: error.message,
-        variant: 'destructive',
-      });
+    try {
+      await signOut();
+    } catch {
+      // Ignora erros - o importante é redirecionar
     }
     setIsLoggingOut(false);
+    navigate('/auth');
   };
 
   // Show loading skeleton while profile is being fetched
