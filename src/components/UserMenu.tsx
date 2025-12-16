@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, Shield, ChevronDown, Users, FileText } from 'lucide-react';
+import { LogOut, User, Shield, ChevronDown, Users, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth, AppRole } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 
@@ -27,7 +28,7 @@ const roleColors: Record<AppRole, string> = {
 };
 
 export function UserMenu() {
-  const { profile, signOut, canAccessAdminFeatures, canAccessGestorFeatures } = useAuth();
+  const { profile, loading, signOut, canAccessAdminFeatures, canAccessGestorFeatures } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -48,7 +49,48 @@ export function UserMenu() {
     setIsLoggingOut(false);
   };
 
-  if (!profile) return null;
+  // Show loading skeleton while profile is being fetched
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2">
+        <Skeleton className="w-8 h-8 rounded-full" />
+        <Skeleton className="w-20 h-4 hidden sm:block" />
+      </div>
+    );
+  }
+
+  // Show minimal menu with logout option if profile failed to load
+  if (!profile) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="gap-2 px-3">
+            <div className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center">
+              <User className="w-4 h-4 text-destructive" />
+            </div>
+            <span className="hidden sm:inline-block text-sm text-muted-foreground">
+              Menu
+            </span>
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel className="font-normal text-muted-foreground">
+            Erro ao carregar perfil
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem 
+            onClick={handleLogout} 
+            disabled={isLoggingOut}
+            className="text-destructive focus:text-destructive cursor-pointer"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            {isLoggingOut ? 'Saindo...' : 'Sair'}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
 
   return (
     <DropdownMenu>
@@ -74,7 +116,7 @@ export function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {profile.role === 'gestor' && (
+        {canAccessGestorFeatures() && (
           <DropdownMenuItem 
             onClick={() => navigate('/reports')}
             className="cursor-pointer"
@@ -92,7 +134,7 @@ export function UserMenu() {
             Gerenciar Usuários
           </DropdownMenuItem>
         )}
-        {(canAccessGestorFeatures() || canAccessAdminFeatures()) && (
+        {canAccessGestorFeatures() && (
           <DropdownMenuSeparator />
         )}
         <DropdownMenuItem 
