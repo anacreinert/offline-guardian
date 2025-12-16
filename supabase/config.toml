@@ -1,1 +1,13 @@
 project_id = "pgxbovrfuumqlfcpampa"
+
+[functions.ocr-plate]
+verify_jwt = false
+
+[functions.ocr-product]
+verify_jwt = false
+
+[functions.ocr-weight]
+verify_jwt = false
+
+[functions.create-user]
+verify_jwt = false
