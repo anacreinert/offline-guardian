@@ -182,53 +182,47 @@ const UserManagement = () => {
 
     setIsCreating(true);
     try {
-      // Create user via Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newUserData.email,
-        password: newUserData.password,
-        options: {
-          data: {
-            full_name: newUserData.fullName,
-          },
+      // Get current session for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Sessão expirada. Faça login novamente.');
+      }
+
+      // Create user via Edge Function (Admin API)
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: newUserData.email,
+          password: newUserData.password,
+          fullName: newUserData.fullName,
+          role: newUserData.role,
         },
       });
 
-      if (authError) throw authError;
-
-      if (authData.user) {
-        // Wait a moment for the trigger to create the user_roles record
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Update role if not default
-        if (newUserData.role !== 'operador') {
-          const { error: roleError } = await supabase
-            .from('user_roles')
-            .upsert({ 
-              user_id: authData.user.id, 
-              role: newUserData.role 
-            }, { 
-              onConflict: 'user_id' 
-            });
-
-          if (roleError) throw roleError;
-        }
-
-        toast({
-          title: 'Usuário criado',
-          description: `${newUserData.fullName} foi cadastrado com sucesso.`,
-        });
-
-        setNewUserData({
-          email: '',
-          password: '',
-          fullName: '',
-          role: 'operador',
-        });
-        setIsCreateDialogOpen(false);
-        
-        // Refresh users list
-        setTimeout(fetchUsers, 1000);
+      if (error) {
+        throw new Error(error.message || 'Erro ao criar usuário');
       }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      toast({
+        title: 'Usuário criado',
+        description: `${newUserData.fullName} foi cadastrado com sucesso.`,
+      });
+
+      setNewUserData({
+        email: '',
+        password: '',
+        fullName: '',
+        role: 'operador',
+      });
+      setIsCreateDialogOpen(false);
+      
+      // Refresh users list
+      setTimeout(fetchUsers, 500);
+
     } catch (error: any) {
       console.error('Error creating user:', error);
       toast({
