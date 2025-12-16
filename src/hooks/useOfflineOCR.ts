@@ -34,18 +34,17 @@ interface ProductOCRResult {
 const MERCOSUL_PLATE_REGEX = /^[A-Z]{3}[0-9][A-Z][0-9]{2}$/;
 const OLD_PLATE_REGEX = /^[A-Z]{3}[0-9]{4}$/;
 
-// Character corrections for common OCR mistakes in plates
-const PLATE_CHAR_CORRECTIONS: Record<string, string> = {
-  '0': 'O', 'O': 'O',
-  '1': 'I', 'I': 'I', 'L': 'I', 'l': 'I',
-  '5': 'S', 'S': 'S',
-  '8': 'B', 'B': 'B',
-  '2': 'Z', 'Z': 'Z',
-  '6': 'G', 'G': 'G',
-  '4': 'A', 'A': 'A',
+// Words to filter out from OCR results (blue strip text)
+const FILTER_WORDS = ['BRASIL', 'BRAZIL', 'MERCOSUL', 'MERCOSUR', 'BR'];
+
+// Positional character corrections for plates
+// Position 0-2: ALWAYS letters
+const LETTER_CORRECTIONS: Record<string, string> = {
+  '0': 'O', '1': 'I', '2': 'Z', '4': 'A', '5': 'S', '6': 'G', '8': 'B', '9': 'G',
 };
 
-const NUM_CHAR_CORRECTIONS: Record<string, string> = {
+// Position 3, 5, 6: ALWAYS numbers
+const NUMBER_CORRECTIONS: Record<string, string> = {
   'O': '0', 'o': '0', 'Q': '0', 'D': '0',
   'I': '1', 'i': '1', 'l': '1', 'L': '1', '|': '1',
   'Z': '2', 'z': '2',
@@ -58,8 +57,20 @@ const NUM_CHAR_CORRECTIONS: Record<string, string> = {
   'g': '9', 'q': '9',
 };
 
-// Advanced preprocessing with local adaptive thresholding
-async function preprocessImageAdvanced(imageDataUrl: string, mode: 'plate' | 'weight' = 'plate'): Promise<string> {
+// Specific corrections for commonly confused characters
+const SPECIFIC_LETTER_CORRECTIONS: Record<string, string> = {
+  'R': 'R', 'P': 'P', 'B': 'B', // R can be confused with P or B
+  '0': 'O', 'D': 'D', 'Q': 'Q', // 0 → O in letter positions
+  '1': 'I', 'L': 'I',           // 1/L → I in letter positions
+  '8': 'B',                      // 8 → B in letter positions
+  '5': 'S',                      // 5 → S in letter positions
+  '6': 'G',                      // 6 → G in letter positions
+  '2': 'Z',                      // 2 → Z in letter positions
+  '4': 'A',                      // 4 → A in letter positions
+};
+
+// Detect and crop the plate region (ROI) - isolate white area, ignore blue strip
+async function detectPlateROI(imageDataUrl: string): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -71,8 +82,97 @@ async function preprocessImageAdvanced(imageDataUrl: string, mode: 'plate' | 'we
         return;
       }
 
-      // Higher scale for better recognition (3x for plates)
-      const scale = mode === 'plate' ? 3 : 2.5;
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      const width = canvas.width;
+      const height = canvas.height;
+
+      // Analyze rows to find the white region (plate characters area)
+      const rowBrightness: number[] = [];
+      const rowBlueScore: number[] = [];
+      
+      for (let y = 0; y < height; y++) {
+        let sumBrightness = 0;
+        let bluePixels = 0;
+        
+        for (let x = 0; x < width; x++) {
+          const idx = (y * width + x) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          
+          const brightness = (r + g + b) / 3;
+          sumBrightness += brightness;
+          
+          // Detect blue pixels (Mercosul blue strip)
+          if (b > 100 && b > r * 1.3 && b > g * 1.1) {
+            bluePixels++;
+          }
+        }
+        
+        rowBrightness.push(sumBrightness / width);
+        rowBlueScore.push(bluePixels / width);
+      }
+
+      // Find the transition from blue to white (top of character area)
+      let topCrop = 0;
+      let bottomCrop = height;
+      
+      // Look for rows that are predominantly white (brightness > 180) and not blue
+      for (let y = 0; y < height; y++) {
+        if (rowBrightness[y] > 150 && rowBlueScore[y] < 0.3) {
+          topCrop = Math.max(0, y - 5);
+          break;
+        }
+      }
+      
+      // Find bottom of white region
+      for (let y = height - 1; y >= topCrop; y--) {
+        if (rowBrightness[y] > 150 && rowBlueScore[y] < 0.3) {
+          bottomCrop = Math.min(height, y + 5);
+          break;
+        }
+      }
+
+      // If we found a valid region, crop it
+      const cropHeight = bottomCrop - topCrop;
+      if (cropHeight > height * 0.2 && cropHeight < height) {
+        const croppedCanvas = document.createElement('canvas');
+        const croppedCtx = croppedCanvas.getContext('2d')!;
+        croppedCanvas.width = width;
+        croppedCanvas.height = cropHeight;
+        croppedCtx.drawImage(canvas, 0, topCrop, width, cropHeight, 0, 0, width, cropHeight);
+        console.log(`[ROI] Cropped from y=${topCrop} to y=${bottomCrop} (${cropHeight}px)`);
+        resolve(croppedCanvas.toDataURL('image/png'));
+      } else {
+        console.log('[ROI] No valid region found, using full image');
+        resolve(imageDataUrl);
+      }
+    };
+
+    img.onerror = () => resolve(imageDataUrl);
+    img.src = imageDataUrl;
+  });
+}
+
+// Mercosul-specific preprocessing: optimize for white background with black text
+async function preprocessMercosul(imageDataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      
+      if (!ctx) {
+        resolve(imageDataUrl);
+        return;
+      }
+
+      const scale = 4; // Higher scale for better character recognition
       canvas.width = img.width * scale;
       canvas.height = img.height * scale;
 
@@ -82,91 +182,25 @@ async function preprocessImageAdvanced(imageDataUrl: string, mode: 'plate' | 'we
 
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
-      const width = canvas.width;
-      const height = canvas.height;
 
-      // Convert to grayscale
-      const grayscale: number[] = [];
+      // Convert to grayscale and apply aggressive threshold for white background
       for (let i = 0; i < data.length; i += 4) {
         const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-        grayscale.push(gray);
-      }
-
-      // Calculate global Otsu threshold
-      const histogram = new Array(256).fill(0);
-      for (const g of grayscale) histogram[g]++;
-
-      const total = grayscale.length;
-      let sum = 0;
-      for (let i = 0; i < 256; i++) sum += i * histogram[i];
-
-      let sumB = 0, wB = 0, wF = 0;
-      let maxVariance = 0, globalThreshold = 128;
-
-      for (let t = 0; t < 256; t++) {
-        wB += histogram[t];
-        if (wB === 0) continue;
-        wF = total - wB;
-        if (wF === 0) break;
-
-        sumB += t * histogram[t];
-        const mB = sumB / wB;
-        const mF = (sum - sumB) / wF;
-        const variance = wB * wF * (mB - mF) * (mB - mF);
-
-        if (variance > maxVariance) {
-          maxVariance = variance;
-          globalThreshold = t;
-        }
-      }
-
-      // Apply LOCAL adaptive thresholding (better for angled/uneven lighting)
-      const blockSize = mode === 'plate' ? 25 : 15;
-      const C = mode === 'plate' ? 10 : 5;
-      const binaryData: number[] = [];
-
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const idx = y * width + x;
-          const halfBlock = Math.floor(blockSize / 2);
-
-          // Calculate local mean
-          let localSum = 0, count = 0;
-          for (let by = -halfBlock; by <= halfBlock; by++) {
-            for (let bx = -halfBlock; bx <= halfBlock; bx++) {
-              const ny = y + by, nx = x + bx;
-              if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
-                localSum += grayscale[ny * width + nx];
-                count++;
-              }
-            }
-          }
-
-          const localMean = localSum / count;
-          // Combine local and global thresholds
-          const threshold = Math.min(globalThreshold * 0.95, localMean - C);
-          binaryData.push(grayscale[idx] < threshold ? 0 : 255);
-        }
-      }
-
-      // Morphological cleaning (remove small noise)
-      const cleaned = morphologicalClean(binaryData, width, height);
-
-      // Apply to image data
-      for (let i = 0; i < cleaned.length; i++) {
-        const val = cleaned[i];
-        data[i * 4] = val;
-        data[i * 4 + 1] = val;
-        data[i * 4 + 2] = val;
-        data[i * 4 + 3] = 255;
+        // Use threshold optimized for black text on white background
+        // Characters (dark) become black, background (light) becomes white
+        const val = gray < 140 ? 0 : 255;
+        data[i] = val;
+        data[i + 1] = val;
+        data[i + 2] = val;
+        data[i + 3] = 255;
       }
 
       ctx.putImageData(imageData, 0, 0);
 
-      // Add padding for edge characters
+      // Add padding
       const paddedCanvas = document.createElement('canvas');
       const paddedCtx = paddedCanvas.getContext('2d')!;
-      const padding = 20;
+      const padding = 30;
       paddedCanvas.width = canvas.width + padding * 2;
       paddedCanvas.height = canvas.height + padding * 2;
       paddedCtx.fillStyle = 'white';
@@ -181,49 +215,8 @@ async function preprocessImageAdvanced(imageDataUrl: string, mode: 'plate' | 'we
   });
 }
 
-// Morphological opening to clean noise
-function morphologicalClean(data: number[], width: number, height: number): number[] {
-  const kernel = 1;
-
-  // Erosion
-  const eroded: number[] = [];
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      let minVal = 255;
-      for (let ky = -kernel; ky <= kernel; ky++) {
-        for (let kx = -kernel; kx <= kernel; kx++) {
-          const ny = y + ky, nx = x + kx;
-          if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
-            minVal = Math.min(minVal, data[ny * width + nx]);
-          }
-        }
-      }
-      eroded.push(minVal);
-    }
-  }
-
-  // Dilation
-  const result: number[] = [];
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      let maxVal = 0;
-      for (let ky = -kernel; ky <= kernel; ky++) {
-        for (let kx = -kernel; kx <= kernel; kx++) {
-          const ny = y + ky, nx = x + kx;
-          if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
-            maxVal = Math.max(maxVal, eroded[ny * width + nx]);
-          }
-        }
-      }
-      result.push(maxVal);
-    }
-  }
-
-  return result;
-}
-
-// High contrast preprocessing variant
-async function preprocessHighContrast(imageDataUrl: string): Promise<string> {
+// Sharp contrast preprocessing
+async function preprocessSharpContrast(imageDataUrl: string): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -231,7 +224,7 @@ async function preprocessHighContrast(imageDataUrl: string): Promise<string> {
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) { resolve(imageDataUrl); return; }
 
-      const scale = 3;
+      const scale = 4;
       canvas.width = img.width * scale;
       canvas.height = img.height * scale;
 
@@ -239,22 +232,67 @@ async function preprocessHighContrast(imageDataUrl: string): Promise<string> {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
 
-      // Very aggressive threshold for high contrast
+      // Sharp contrast with Sauvola-like local threshold
+      const width = canvas.width;
+      const height = canvas.height;
+      const grayscale: number[] = [];
+      
       for (let i = 0; i < data.length; i += 4) {
-        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-        const val = gray < 100 ? 0 : 255;
-        data[i] = data[i + 1] = data[i + 2] = val;
+        grayscale.push(Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]));
+      }
+
+      // Calculate local mean and apply threshold
+      const blockSize = 15;
+      const k = 0.2;
+      
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = y * width + x;
+          const half = Math.floor(blockSize / 2);
+          
+          let sum = 0, sumSq = 0, count = 0;
+          for (let dy = -half; dy <= half; dy++) {
+            for (let dx = -half; dx <= half; dx++) {
+              const ny = y + dy, nx = x + dx;
+              if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
+                const val = grayscale[ny * width + nx];
+                sum += val;
+                sumSq += val * val;
+                count++;
+              }
+            }
+          }
+          
+          const mean = sum / count;
+          const std = Math.sqrt(sumSq / count - mean * mean);
+          const threshold = mean * (1 + k * (std / 128 - 1));
+          
+          const pixelIdx = idx * 4;
+          const val = grayscale[idx] < threshold ? 0 : 255;
+          data[pixelIdx] = data[pixelIdx + 1] = data[pixelIdx + 2] = val;
+        }
       }
 
       ctx.putImageData(imageData, 0, 0);
-      resolve(canvas.toDataURL('image/png'));
+      
+      // Add padding
+      const paddedCanvas = document.createElement('canvas');
+      const paddedCtx = paddedCanvas.getContext('2d')!;
+      const padding = 30;
+      paddedCanvas.width = canvas.width + padding * 2;
+      paddedCanvas.height = canvas.height + padding * 2;
+      paddedCtx.fillStyle = 'white';
+      paddedCtx.fillRect(0, 0, paddedCanvas.width, paddedCanvas.height);
+      paddedCtx.drawImage(canvas, padding, padding);
+
+      resolve(paddedCanvas.toDataURL('image/png'));
     };
     img.onerror = () => resolve(imageDataUrl);
     img.src = imageDataUrl;
   });
 }
 
-// Inverted preprocessing for different plate colors
+// Inverted preprocessing for testing
 async function preprocessInverted(imageDataUrl: string): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -263,7 +301,7 @@ async function preprocessInverted(imageDataUrl: string): Promise<string> {
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) { resolve(imageDataUrl); return; }
 
-      const scale = 3;
+      const scale = 4;
       canvas.width = img.width * scale;
       canvas.height = img.height * scale;
 
@@ -273,8 +311,7 @@ async function preprocessInverted(imageDataUrl: string): Promise<string> {
 
       for (let i = 0; i < data.length; i += 4) {
         const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-        // Invert: dark becomes light
-        const val = gray > 128 ? 0 : 255;
+        const val = gray > 140 ? 0 : 255;
         data[i] = data[i + 1] = data[i + 2] = val;
       }
 
@@ -286,8 +323,8 @@ async function preprocessInverted(imageDataUrl: string): Promise<string> {
   });
 }
 
-// Enhanced contrast with CLAHE-like approach
-async function preprocessEnhancedContrast(imageDataUrl: string): Promise<string> {
+// Enhanced preprocessing with dilation for broken characters
+async function preprocessWithDilation(imageDataUrl: string): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -295,34 +332,62 @@ async function preprocessEnhancedContrast(imageDataUrl: string): Promise<string>
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) { resolve(imageDataUrl); return; }
 
-      const scale = 3;
+      const scale = 4;
       canvas.width = img.width * scale;
       canvas.height = img.height * scale;
 
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
+      const width = canvas.width;
+      const height = canvas.height;
 
-      // Find min/max for contrast stretching
-      let minGray = 255, maxGray = 0;
-      for (let i = 0; i < data.length; i += 4) {
-        const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-        minGray = Math.min(minGray, gray);
-        maxGray = Math.max(maxGray, gray);
-      }
-
-      const range = maxGray - minGray || 1;
-
-      // Apply contrast stretching then threshold
+      // First pass: threshold
+      const binary: boolean[] = [];
       for (let i = 0; i < data.length; i += 4) {
         const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-        const stretched = ((gray - minGray) / range) * 255;
-        const val = stretched < 128 ? 0 : 255;
-        data[i] = data[i + 1] = data[i + 2] = val;
+        binary.push(gray < 140);
+      }
+
+      // Slight dilation to connect broken parts of characters
+      const dilated: boolean[] = [];
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          let isDark = binary[y * width + x];
+          if (!isDark) {
+            // Check neighbors
+            for (let dy = -1; dy <= 1 && !isDark; dy++) {
+              for (let dx = -1; dx <= 1 && !isDark; dx++) {
+                const ny = y + dy, nx = x + dx;
+                if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
+                  if (binary[ny * width + nx]) isDark = true;
+                }
+              }
+            }
+          }
+          dilated.push(isDark);
+        }
+      }
+
+      // Apply to image
+      for (let i = 0; i < dilated.length; i++) {
+        const val = dilated[i] ? 0 : 255;
+        data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = val;
       }
 
       ctx.putImageData(imageData, 0, 0);
-      resolve(canvas.toDataURL('image/png'));
+
+      // Add padding
+      const paddedCanvas = document.createElement('canvas');
+      const paddedCtx = paddedCanvas.getContext('2d')!;
+      const padding = 30;
+      paddedCanvas.width = canvas.width + padding * 2;
+      paddedCanvas.height = canvas.height + padding * 2;
+      paddedCtx.fillStyle = 'white';
+      paddedCtx.fillRect(0, 0, paddedCanvas.width, paddedCanvas.height);
+      paddedCtx.drawImage(canvas, padding, padding);
+
+      resolve(paddedCanvas.toDataURL('image/png'));
     };
     img.onerror = () => resolve(imageDataUrl);
     img.src = imageDataUrl;
@@ -330,122 +395,174 @@ async function preprocessEnhancedContrast(imageDataUrl: string): Promise<string>
 }
 
 // Generate multiple preprocessed versions for multi-pass OCR
-async function multiPassPreprocess(imageDataUrl: string): Promise<string[]> {
+async function multiPassPreprocessMercosul(imageDataUrl: string): Promise<string[]> {
+  // First, try to detect and crop the plate region
+  const croppedImage = await detectPlateROI(imageDataUrl);
+  
   const results = await Promise.all([
-    preprocessImageAdvanced(imageDataUrl, 'plate'),
-    preprocessHighContrast(imageDataUrl),
-    preprocessInverted(imageDataUrl),
-    preprocessEnhancedContrast(imageDataUrl),
+    preprocessMercosul(croppedImage),
+    preprocessSharpContrast(croppedImage),
+    preprocessWithDilation(croppedImage),
+    preprocessInverted(croppedImage),
   ]);
   return results;
 }
 
-function applyPlateCorrections(text: string): string {
+// Apply positional corrections to plate text
+function applyPositionalCorrections(text: string): string {
   const cleaned = text.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   if (cleaned.length !== 7) return cleaned;
 
   let result = '';
 
-  // Positions 0,1,2 should be letters
+  // Positions 0, 1, 2: ALWAYS letters
   for (let i = 0; i < 3; i++) {
     const char = cleaned[i];
-    result += NUM_CHAR_CORRECTIONS[char]
-      ? Object.entries(PLATE_CHAR_CORRECTIONS).find(([_, v]) => v === char)?.[1] || char
-      : char;
+    if (/[0-9]/.test(char)) {
+      result += LETTER_CORRECTIONS[char] || char;
+    } else {
+      result += char;
+    }
   }
 
-  // Position 3 should be number
+  // Position 3: ALWAYS number
   const pos3 = cleaned[3];
-  result += NUM_CHAR_CORRECTIONS[pos3] || pos3;
-
-  // Position 4 could be letter (Mercosul) or number (old)
-  const pos4 = cleaned[4];
-  const asNum = NUM_CHAR_CORRECTIONS[pos4] || pos4;
-  const isDigit = /[0-9]/.test(asNum);
-
-  if (isDigit) {
-    result += asNum;
-    for (let i = 5; i < 7; i++) {
-      const char = cleaned[i];
-      result += NUM_CHAR_CORRECTIONS[char] || char;
-    }
+  if (/[A-Z]/.test(pos3)) {
+    result += NUMBER_CORRECTIONS[pos3] || pos3;
   } else {
-    result += pos4;
-    for (let i = 5; i < 7; i++) {
-      const char = cleaned[i];
-      result += NUM_CHAR_CORRECTIONS[char] || char;
+    result += pos3;
+  }
+
+  // Position 4: Letter for Mercosul, Number for old format
+  // Try to determine which format based on context
+  const pos4 = cleaned[4];
+  const pos5 = cleaned[5];
+  const pos6 = cleaned[6];
+
+  // Check if positions 5 and 6 look like numbers
+  const pos5AsNum = NUMBER_CORRECTIONS[pos5] || pos5;
+  const pos6AsNum = NUMBER_CORRECTIONS[pos6] || pos6;
+  const pos5IsNum = /[0-9]/.test(pos5AsNum);
+  const pos6IsNum = /[0-9]/.test(pos6AsNum);
+
+  if (pos5IsNum && pos6IsNum) {
+    // Likely Mercosul format - position 4 should be a letter
+    if (/[0-9]/.test(pos4)) {
+      result += LETTER_CORRECTIONS[pos4] || pos4;
+    } else {
+      result += pos4;
     }
+    result += pos5AsNum;
+    result += pos6AsNum;
+  } else {
+    // Might be old format - position 4 should be a number
+    if (/[A-Z]/.test(pos4)) {
+      result += NUMBER_CORRECTIONS[pos4] || pos4;
+    } else {
+      result += pos4;
+    }
+    // Positions 5 and 6 are numbers
+    result += /[A-Z]/.test(pos5) ? (NUMBER_CORRECTIONS[pos5] || pos5) : pos5;
+    result += /[A-Z]/.test(pos6) ? (NUMBER_CORRECTIONS[pos6] || pos6) : pos6;
   }
 
   return result;
 }
 
-function cleanPlateText(text: string): string | null {
-  const variations = [
-    text,
-    text.replace(/[^A-Za-z0-9\s]/g, ''),
-    text.replace(/\s+/g, ''),
-  ];
-
-  for (const variation of variations) {
-    const corrected = applyPlateCorrections(variation);
-    if (MERCOSUL_PLATE_REGEX.test(corrected) || OLD_PLATE_REGEX.test(corrected)) {
-      return corrected;
-    }
+// Filter out unwanted text (BRASIL, MERCOSUL, etc.)
+function filterPlateText(text: string): string {
+  let filtered = text.toUpperCase();
+  
+  for (const word of FILTER_WORDS) {
+    filtered = filtered.replace(new RegExp(word, 'gi'), ' ');
   }
-
-  const allText = text.replace(/\s+/g, '').toUpperCase();
-
-  for (let i = 0; i <= allText.length - 7; i++) {
-    const segment = allText.substring(i, i + 7);
-    const corrected = applyPlateCorrections(segment);
-    if (MERCOSUL_PLATE_REGEX.test(corrected) || OLD_PLATE_REGEX.test(corrected)) {
-      return corrected;
-    }
-  }
-
-  const mercosulMatch = allText.match(/[A-Z0-9]{3}[0-9A-Z][A-Z0-9][0-9A-Z]{2}/);
-  if (mercosulMatch) {
-    const corrected = applyPlateCorrections(mercosulMatch[0]);
-    if (MERCOSUL_PLATE_REGEX.test(corrected) || OLD_PLATE_REGEX.test(corrected)) {
-      return corrected;
-    }
-  }
-
-  return null;
+  
+  return filtered;
 }
 
-// Find best plate from multiple OCR attempts
+// Extract potential plate candidates from text
+function extractPlateCandidates(text: string): string[] {
+  const candidates: string[] = [];
+  const filtered = filterPlateText(text);
+  const cleaned = filtered.replace(/[^A-Z0-9\s]/g, '').trim();
+  
+  // Split by whitespace and look for 7-character segments
+  const words = cleaned.split(/\s+/);
+  
+  for (const word of words) {
+    if (word.length === 7) {
+      candidates.push(word);
+    }
+    // Also try combining adjacent words
+    if (word.length >= 3 && word.length < 7) {
+      const nextIdx = words.indexOf(word) + 1;
+      if (nextIdx < words.length) {
+        const combined = word + words[nextIdx];
+        if (combined.length >= 7) {
+          candidates.push(combined.substring(0, 7));
+        }
+      }
+    }
+  }
+  
+  // Look for patterns in the continuous text
+  const continuous = cleaned.replace(/\s+/g, '');
+  
+  // Mercosul pattern: 3 letters, 1 number, 1 letter, 2 numbers
+  const mercosulMatches = continuous.match(/[A-Z]{3}[0-9][A-Z][0-9]{2}/g);
+  if (mercosulMatches) candidates.push(...mercosulMatches);
+  
+  // Old pattern: 3 letters, 4 numbers
+  const oldMatches = continuous.match(/[A-Z]{3}[0-9]{4}/g);
+  if (oldMatches) candidates.push(...oldMatches);
+  
+  // Generic 7-character alphanumeric
+  for (let i = 0; i <= continuous.length - 7; i++) {
+    const segment = continuous.substring(i, i + 7);
+    if (/^[A-Z0-9]{7}$/.test(segment)) {
+      candidates.push(segment);
+    }
+  }
+  
+  return [...new Set(candidates)];
+}
+
+// Find best plate from multiple OCR attempts with improved scoring
 function findBestPlateMatch(texts: string[]): string | null {
-  const candidates: { plate: string; score: number }[] = [];
+  const candidates: { plate: string; score: number; original: string }[] = [];
 
   for (const text of texts) {
-    // Try direct cleaning
-    const cleaned = cleanPlateText(text);
-    if (cleaned) {
-      const isValid = MERCOSUL_PLATE_REGEX.test(cleaned) || OLD_PLATE_REGEX.test(cleaned);
-      candidates.push({ plate: cleaned, score: isValid ? 100 : 50 });
-    }
-
-    // Try finding patterns in raw text
-    const patterns = [
-      /[A-Z]{3}[0-9][A-Z][0-9]{2}/g,
-      /[A-Z]{3}[0-9]{4}/g,
-      /[A-Z0-9]{7}/g,
-    ];
-
-    for (const pattern of patterns) {
-      const matches = text.toUpperCase().match(pattern);
-      if (matches) {
-        for (const match of matches) {
-          const corrected = applyPlateCorrections(match);
-          const isValid = MERCOSUL_PLATE_REGEX.test(corrected) || OLD_PLATE_REGEX.test(corrected);
-          if (isValid) {
-            candidates.push({ plate: corrected, score: 100 });
-          } else if (corrected.length === 7) {
-            candidates.push({ plate: corrected, score: 40 });
-          }
+    const potentialPlates = extractPlateCandidates(text);
+    
+    for (const rawPlate of potentialPlates) {
+      const corrected = applyPositionalCorrections(rawPlate);
+      
+      let score = 0;
+      
+      // Perfect Mercosul format gets highest score
+      if (MERCOSUL_PLATE_REGEX.test(corrected)) {
+        score = 100;
+      } else if (OLD_PLATE_REGEX.test(corrected)) {
+        score = 95;
+      } else if (corrected.length === 7) {
+        // Partial match - check how many positions are valid
+        const letters = corrected.substring(0, 3);
+        const hasValidLetters = /^[A-Z]{3}$/.test(letters);
+        const pos3Valid = /[0-9]/.test(corrected[3]);
+        
+        if (hasValidLetters) score += 40;
+        if (pos3Valid) score += 20;
+        
+        // Check if it looks like a plate (mix of letters and numbers)
+        const letterCount = (corrected.match(/[A-Z]/g) || []).length;
+        const numberCount = (corrected.match(/[0-9]/g) || []).length;
+        if (letterCount >= 3 && letterCount <= 4 && numberCount >= 3) {
+          score += 20;
         }
+      }
+      
+      if (score > 0) {
+        candidates.push({ plate: corrected, score, original: rawPlate });
       }
     }
   }
@@ -458,16 +575,50 @@ function findBestPlateMatch(texts: string[]): string | null {
     plateCounts[c.plate] = (plateCounts[c.plate] || 0) + 1;
   }
 
-  // Sort by (occurrences * score)
+  // Sort by weighted score (base score * occurrence bonus)
   candidates.sort((a, b) => {
-    const scoreA = a.score * (plateCounts[a.plate] || 1);
-    const scoreB = b.score * (plateCounts[b.plate] || 1);
+    const scoreA = a.score * (1 + (plateCounts[a.plate] - 1) * 0.5);
+    const scoreB = b.score * (1 + (plateCounts[b.plate] - 1) * 0.5);
     return scoreB - scoreA;
   });
+
+  console.log('[OCR] Top candidates:', candidates.slice(0, 5).map(c => 
+    `${c.plate} (score: ${c.score}, count: ${plateCounts[c.plate]}, orig: ${c.original})`
+  ));
 
   return candidates[0].plate;
 }
 
+// Tesseract configurations optimized for plates
+const TESSERACT_CONFIG_SINGLE_WORD = {
+  tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+  tessedit_pageseg_mode: '8', // Single word
+  tessedit_ocr_engine_mode: '1', // LSTM only
+  preserve_interword_spaces: '0',
+};
+
+const TESSERACT_CONFIG_SINGLE_LINE = {
+  tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+  tessedit_pageseg_mode: '7', // Single line
+  tessedit_ocr_engine_mode: '1',
+  preserve_interword_spaces: '0',
+};
+
+const TESSERACT_CONFIG_SPARSE = {
+  tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+  tessedit_pageseg_mode: '11', // Sparse text
+  tessedit_ocr_engine_mode: '1',
+  preserve_interword_spaces: '0',
+};
+
+const TESSERACT_CONFIG_WEIGHT = {
+  tessedit_char_whitelist: '0123456789.,KGkgPBTARANETLIQUIDO: ',
+  tessedit_pageseg_mode: '6',
+  tessedit_ocr_engine_mode: '3',
+  preserve_interword_spaces: '1',
+};
+
+// Weight extraction functions
 function extractWeight(text: string): number | null {
   let cleaned = text
     .replace(/[oO]/g, '0')
@@ -560,34 +711,57 @@ function detectProduct(text: string): string | null {
   return null;
 }
 
-// Tesseract configurations
-const TESSERACT_CONFIG_PLATE_LINE = {
-  tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-  tessedit_pageseg_mode: '7', // Single line
-  tessedit_ocr_engine_mode: '3',
-  preserve_interword_spaces: '0',
-};
+// Weight preprocessing
+async function preprocessImageAdvanced(imageDataUrl: string, mode: 'plate' | 'weight' = 'plate'): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      
+      if (!ctx) {
+        resolve(imageDataUrl);
+        return;
+      }
 
-const TESSERACT_CONFIG_PLATE_BLOCK = {
-  tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-  tessedit_pageseg_mode: '6', // Single block
-  tessedit_ocr_engine_mode: '3',
-  preserve_interword_spaces: '0',
-};
+      const scale = mode === 'plate' ? 3 : 2.5;
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
 
-const TESSERACT_CONFIG_PLATE_SPARSE = {
-  tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-  tessedit_pageseg_mode: '11', // Sparse text
-  tessedit_ocr_engine_mode: '3',
-  preserve_interword_spaces: '0',
-};
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-const TESSERACT_CONFIG_WEIGHT = {
-  tessedit_char_whitelist: '0123456789.,KGkgPBTARANETLIQUIDO: ',
-  tessedit_pageseg_mode: '6',
-  tessedit_ocr_engine_mode: '3',
-  preserve_interword_spaces: '1',
-};
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+        const val = gray < 128 ? 0 : 255;
+        data[i] = val;
+        data[i + 1] = val;
+        data[i + 2] = val;
+        data[i + 3] = 255;
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+
+      const paddedCanvas = document.createElement('canvas');
+      const paddedCtx = paddedCanvas.getContext('2d')!;
+      const padding = 20;
+      paddedCanvas.width = canvas.width + padding * 2;
+      paddedCanvas.height = canvas.height + padding * 2;
+      paddedCtx.fillStyle = 'white';
+      paddedCtx.fillRect(0, 0, paddedCanvas.width, paddedCanvas.height);
+      paddedCtx.drawImage(canvas, padding, padding);
+
+      resolve(paddedCanvas.toDataURL('image/png'));
+    };
+
+    img.onerror = () => resolve(imageDataUrl);
+    img.src = imageDataUrl;
+  });
+}
 
 export function useOfflineOCR() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -600,13 +774,13 @@ export function useOfflineOCR() {
     setProgress(0);
 
     try {
-      console.log('[Offline OCR] Starting multi-pass plate recognition...');
+      console.log('[Offline OCR] Starting improved multi-pass plate recognition...');
 
-      // Generate multiple preprocessed versions
-      const processedImages = await multiPassPreprocess(imageDataUrl);
+      // Generate multiple preprocessed versions with ROI detection
+      const processedImages = await multiPassPreprocessMercosul(imageDataUrl);
       setProgress(15);
 
-      const configs = [TESSERACT_CONFIG_PLATE_LINE, TESSERACT_CONFIG_PLATE_BLOCK, TESSERACT_CONFIG_PLATE_SPARSE];
+      const configs = [TESSERACT_CONFIG_SINGLE_WORD, TESSERACT_CONFIG_SINGLE_LINE, TESSERACT_CONFIG_SPARSE];
       const allTexts: string[] = [];
 
       const totalPasses = processedImages.length * configs.length;
