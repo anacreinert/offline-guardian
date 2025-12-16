@@ -15,40 +15,46 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    const { email, newPassword } = await req.json();
+    const { userId, email, newPassword } = await req.json();
 
-    if (!email || !newPassword) {
+    if ((!userId && !email) || !newPassword) {
       return new Response(
-        JSON.stringify({ error: 'Email e nova senha são obrigatórios' }),
+        JSON.stringify({ error: 'userId ou email e nova senha são obrigatórios' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Find user by email
-    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    
-    if (listError) {
-      console.error('Error listing users:', listError);
-      return new Response(
-        JSON.stringify({ error: 'Erro ao buscar usuários' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    let targetUserId = userId;
 
-    const user = users.find(u => u.email === email);
-    
-    if (!user) {
-      return new Response(
-        JSON.stringify({ error: 'Usuário não encontrado' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // If email provided, find user by email
+    if (!targetUserId && email) {
+      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+      
+      if (listError) {
+        console.error('Error listing users:', listError);
+        return new Response(
+          JSON.stringify({ error: 'Erro ao buscar usuários' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const user = users.find(u => u.email === email);
+      
+      if (!user) {
+        return new Response(
+          JSON.stringify({ error: 'Usuário não encontrado' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      targetUserId = user.id;
     }
 
     // Update password
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      user.id,
+      targetUserId,
       { password: newPassword }
     );
 
@@ -60,7 +66,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Password updated for ${email}`);
+    console.log(`Password updated for user ${targetUserId}`);
 
     return new Response(
       JSON.stringify({ success: true, message: 'Senha atualizada com sucesso' }),
