@@ -247,6 +247,27 @@ export function useWeighingRecords() {
     }
   }, [saveLocalRecords]);
 
+  // Delete a local record (not synced to database)
+  const deleteLocalRecord = useCallback((id: string) => {
+    setRecords(prev => {
+      const updated = prev.filter(r => r.id !== id);
+      recordsRef.current = updated;
+      
+      // Save updated local records to localStorage
+      const localRecords = updated.filter(
+        r => r.syncStatus === 'pending' || r.syncStatus === 'error' || r.syncStatus === 'syncing'
+      );
+      saveLocalRecords(localRecords);
+      
+      return updated;
+    });
+
+    setSyncQueue(prev => ({
+      ...prev,
+      pendingCount: Math.max(0, prev.pendingCount - 1),
+    }));
+  }, [saveLocalRecords]);
+
   // Get pending records (use ref for immediate access)
   const getPendingRecords = useCallback(() => {
     return recordsRef.current.filter(r => r.syncStatus === 'pending' || r.syncStatus === 'error');
@@ -269,6 +290,7 @@ export function useWeighingRecords() {
     syncQueue,
     addRecord,
     updateRecordSyncStatus,
+    deleteLocalRecord,
     getPendingRecords,
     getTodayRecords,
     setSyncQueue,

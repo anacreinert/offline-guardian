@@ -12,15 +12,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { PhotoViewer } from '@/components/PhotoViewer';
 import { cn } from '@/lib/utils';
 
@@ -42,26 +42,23 @@ interface SyncErrorRecord {
   photo_urls: PhotoUrls | null;
   sync_error?: string;
   sync_attempts?: number;
-  deletion_requested?: boolean;
-  deletion_reason?: string;
 }
 
 interface SyncErrorManagerProps {
   records: SyncErrorRecord[];
   onRetrySync: (id: string) => Promise<void>;
-  onRequestDeletion: (id: string, reason: string) => Promise<void>;
+  onDelete: (id: string) => void;
   isLoading?: boolean;
 }
 
 export function SyncErrorManager({ 
   records, 
   onRetrySync, 
-  onRequestDeletion,
+  onDelete,
   isLoading 
 }: SyncErrorManagerProps) {
   const [selectedRecord, setSelectedRecord] = useState<SyncErrorRecord | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deletionReason, setDeletionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleRetrySync = async (record: SyncErrorRecord) => {
@@ -73,23 +70,15 @@ export function SyncErrorManager({
     }
   };
 
-  const handleRequestDeletion = async () => {
-    if (!selectedRecord || !deletionReason.trim()) return;
-    
-    setIsProcessing(true);
-    try {
-      await onRequestDeletion(selectedRecord.id, deletionReason.trim());
-      setShowDeleteDialog(false);
-      setSelectedRecord(null);
-      setDeletionReason('');
-    } finally {
-      setIsProcessing(false);
-    }
+  const handleDelete = () => {
+    if (!selectedRecord) return;
+    onDelete(selectedRecord.id);
+    setShowDeleteDialog(false);
+    setSelectedRecord(null);
   };
 
   const openDeleteDialog = (record: SyncErrorRecord) => {
     setSelectedRecord(record);
-    setDeletionReason('');
     setShowDeleteDialog(true);
   };
 
@@ -129,14 +118,14 @@ export function SyncErrorManager({
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            Estes registros existem apenas localmente e não foram sincronizados ao banco de dados.
+          </p>
           <div className="space-y-4">
             {records.map((record) => (
               <div
                 key={record.id}
-                className={cn(
-                  "p-4 rounded-lg border bg-card",
-                  record.deletion_requested && "border-destructive/50 bg-destructive/5"
-                )}
+                className="p-4 rounded-lg border bg-card"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 space-y-2">
@@ -148,9 +137,9 @@ export function SyncErrorManager({
                       {record.product && (
                         <Badge variant="secondary">{record.product}</Badge>
                       )}
-                      {record.deletion_requested && (
-                        <Badge variant="destructive">Exclusão Solicitada</Badge>
-                      )}
+                      <Badge variant="outline" className="text-status-offline border-status-offline">
+                        Local
+                      </Badge>
                     </div>
 
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -169,12 +158,6 @@ export function SyncErrorManager({
                       </div>
                     )}
 
-                    {record.deletion_requested && record.deletion_reason && (
-                      <div className="mt-2 p-2 rounded bg-muted text-sm">
-                        <span className="font-medium">Motivo da exclusão:</span> {record.deletion_reason}
-                      </div>
-                    )}
-
                     {record.photo_urls && (
                       <div className="mt-3">
                         <PhotoViewer photoUrls={record.photo_urls} vehiclePlate={record.vehicle_plate} />
@@ -182,31 +165,29 @@ export function SyncErrorManager({
                     )}
                   </div>
 
-                  {!record.deletion_requested && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={isProcessing}>
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-popover border">
-                        <DropdownMenuItem 
-                          onClick={() => handleRetrySync(record)}
-                          className="gap-2"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                          Tentar Sincronizar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => openDeleteDialog(record)}
-                          className="gap-2 text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Solicitar Exclusão
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" disabled={isProcessing}>
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-popover border">
+                      <DropdownMenuItem 
+                        onClick={() => handleRetrySync(record)}
+                        className="gap-2"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Tentar Sincronizar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => openDeleteDialog(record)}
+                        className="gap-2 text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Excluir
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             ))}
@@ -214,14 +195,15 @@ export function SyncErrorManager({
         </CardContent>
       </Card>
 
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Solicitar Exclusão do Registro</DialogTitle>
-            <DialogDescription>
-              Informe o motivo da exclusão. Esta solicitação será enviada para aprovação do gestor.
-            </DialogDescription>
-          </DialogHeader>
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Registro Local</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este registro existe apenas localmente e não foi sincronizado ao banco de dados.
+              Ao excluir, ele será removido permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           
           {selectedRecord && (
             <div className="py-2">
@@ -237,42 +219,17 @@ export function SyncErrorManager({
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="deletion-reason">Motivo da exclusão *</Label>
-            <Textarea
-              id="deletion-reason"
-              placeholder="Ex: Registro duplicado, dados incorretos, teste..."
-              value={deletionReason}
-              onChange={(e) => setDeletionReason(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setShowDeleteDialog(false)}
-              disabled={isProcessing}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Cancelar
-            </Button>
-            <Button 
-              variant="destructive"
-              onClick={handleRequestDeletion}
-              disabled={!deletionReason.trim() || isProcessing}
-            >
-              {isProcessing ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Processando...
-                </>
-              ) : (
-                'Solicitar Exclusão'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
