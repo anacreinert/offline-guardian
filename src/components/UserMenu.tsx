@@ -35,6 +35,8 @@ export function UserMenu() {
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
+    // Navegar primeiro para evitar condição de corrida com o useEffect de redirecionamento
+    navigate('/auth');
     const { error } = await signOut();
     
     if (error) {
@@ -43,8 +45,6 @@ export function UserMenu() {
         description: error.message,
         variant: 'destructive',
       });
-    } else {
-      navigate('/auth');
     }
     setIsLoggingOut(false);
   };
