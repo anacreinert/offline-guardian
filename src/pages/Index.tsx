@@ -169,10 +169,10 @@ const Index = () => {
             </div>
             <RecordsList
               records={records}
-              onRetrySingle={syncSingle}
               filter={recordsFilter}
               onFilterChange={setRecordsFilter}
               maxRecords={isAdmin ? undefined : 5}
+              readOnly={true}
             />
           </div>
         </div>
