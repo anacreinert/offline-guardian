@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Scale, Database } from 'lucide-react';
 import { StatusBanner } from '@/components/StatusBanner';
@@ -6,7 +6,6 @@ import { WeighingForm } from '@/components/WeighingForm';
 import { RecordsList } from '@/components/RecordsList';
 import { MetricsCards } from '@/components/MetricsCards';
 import { UserMenu } from '@/components/UserMenu';
-import { SyncDebugPanel } from '@/components/SyncDebugPanel';
 import { useConnectionStatus } from '@/hooks/useConnectionStatus';
 import { useWeighingRecords } from '@/hooks/useWeighingRecords';
 import { useSyncManager } from '@/hooks/useSyncManager';
@@ -47,9 +46,11 @@ const Index = () => {
   });
 
   const [recordsFilter, setRecordsFilter] = useState<'all' | 'pending' | 'synced' | 'error'>('all');
+  const hasAutoSynced = useRef(false);
 
   const todayRecords = getTodayRecords();
   const offlineRecordsToday = todayRecords.filter(r => r.createdOffline).length;
+  const errorRecordsCount = records.filter(r => r.syncStatus === 'error').length;
 
   // Redirect to auth if not authenticated
   useEffect(() => {
@@ -58,21 +59,24 @@ const Index = () => {
     }
   }, [isAuthenticated, loading, navigate]);
 
-  // Auto-sync pending records when coming back online (including offline-created ones)
-  // Offline-created records will be sent with pending_approval status for gestor review
+  // Auto-sync pending records ONCE when coming back online
   useEffect(() => {
     const pending = getPendingRecords();
 
-    if (!isOffline && pending.length > 0 && !syncQueue.isProcessing) {
-      // Small delay to ensure stable connection
+    if (!isOffline && pending.length > 0 && !syncQueue.isProcessing && !hasAutoSynced.current) {
+      hasAutoSynced.current = true;
       const timer = setTimeout(async () => {
         await syncAll();
-        // Refresh records from database after sync
         refreshRecords();
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [isOffline, syncQueue.isProcessing, syncAll, refreshRecords, getPendingRecords]);
+    
+    // Reset flag when going offline
+    if (isOffline) {
+      hasAutoSynced.current = false;
+    }
+  }, [isOffline]);
 
   const handleSubmit = async (data: Parameters<typeof addRecord>[0]) => {
     const newRecord = addRecord(data, isOffline);
@@ -135,18 +139,8 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Metrics */}
-        <div className="mb-8">
-          <MetricsCards
-            totalRecordsToday={todayRecords.length}
-            offlineRecordsToday={offlineRecordsToday}
-            pendingSyncCount={syncQueue.pendingCount}
-            lastSyncTime={syncQueue.lastSyncTime}
-          />
-        </div>
-
-        {/* Main Content */}
-        <div className={isAdmin ? '' : 'grid grid-cols-1 xl:grid-cols-2 gap-8'}>
+        {/* Main Content - Form first, then Records */}
+        <div className="space-y-8">
           {/* Form - Hidden for Admin */}
           {!isAdmin && (
             <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
@@ -154,7 +148,19 @@ const Index = () => {
             </div>
           )}
 
-          {/* Records List */}
+          {/* Metrics */}
+          <div className="animate-fade-in" style={{ animationDelay: '250ms' }}>
+            <MetricsCards
+              totalRecordsToday={todayRecords.length}
+              offlineRecordsToday={offlineRecordsToday}
+              pendingSyncCount={syncQueue.pendingCount}
+              errorCount={errorRecordsCount}
+              lastSyncTime={syncQueue.lastSyncTime}
+              records={records}
+            />
+          </div>
+
+          {/* Records List - Always below */}
           <div className="animate-fade-in" style={{ animationDelay: '300ms' }}>
             <div className="flex items-center gap-3 mb-4">
               <h2 className="text-xl font-semibold">
@@ -166,18 +172,9 @@ const Index = () => {
               onRetrySingle={syncSingle}
               filter={recordsFilter}
               onFilterChange={setRecordsFilter}
+              maxRecords={isAdmin ? undefined : 5}
             />
           </div>
-        </div>
-
-        {/* Debug Panel */}
-        <div className="mt-8 animate-fade-in" style={{ animationDelay: '400ms' }}>
-          <SyncDebugPanel
-            syncQueue={syncQueue}
-            records={records}
-            onSyncAll={syncAll}
-            isOnline={!isOffline}
-          />
         </div>
       </main>
     </div>

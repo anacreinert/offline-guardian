@@ -28,6 +28,7 @@ interface RecordsListProps {
   onRetrySingle: (id: string) => void;
   filter: 'all' | 'pending' | 'synced' | 'error';
   onFilterChange: (filter: 'all' | 'pending' | 'synced' | 'error') => void;
+  maxRecords?: number;
 }
 
 const syncStatusConfig: Record<SyncStatus, { icon: typeof Clock; label: string; className: string }> = {
@@ -60,13 +61,16 @@ const filters = [
   { value: 'error', label: 'Com Erro' },
 ] as const;
 
-export function RecordsList({ records, onRetrySingle, filter, onFilterChange }: RecordsListProps) {
+export function RecordsList({ records, onRetrySingle, filter, onFilterChange, maxRecords }: RecordsListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const filteredRecords = records.filter(record => {
     if (filter === 'all') return true;
     return record.syncStatus === filter;
   });
+
+  // Apply max records limit if specified
+  const displayRecords = maxRecords ? filteredRecords.slice(0, maxRecords) : filteredRecords;
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -101,13 +105,13 @@ export function RecordsList({ records, onRetrySingle, filter, onFilterChange }: 
           </button>
         ))}
         <span className="ml-auto text-sm text-muted-foreground">
-          {filteredRecords.length} registro(s)
+          {displayRecords.length}{maxRecords && filteredRecords.length > maxRecords ? `/${filteredRecords.length}` : ''} registro(s)
         </span>
       </div>
 
       {/* Records List */}
       <div className="divide-y divide-border/50">
-        {filteredRecords.map(record => {
+        {displayRecords.map(record => {
           const statusConfig = syncStatusConfig[record.syncStatus];
           const StatusIcon = statusConfig.icon;
           const isExpanded = expandedId === record.id;
