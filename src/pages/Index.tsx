@@ -149,7 +149,6 @@ const Index = () => {
               pendingSyncCount={syncQueue.pendingCount}
               errorCount={errorRecordsCount}
               lastSyncTime={syncQueue.lastSyncTime}
-              records={records}
             />
           </div>
 
