@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FileText, CheckCircle, Clock, ArrowLeft, Calendar, Scale, XCircle, AlertCircle } from 'lucide-react';
+import { FileText, CheckCircle, Clock, ArrowLeft, Calendar, Scale, XCircle, AlertCircle, Trash2 } from 'lucide-react';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,10 @@ interface WeighingRecord {
   created_at: string;
   user_id: string;
   photo_urls: PhotoUrls | null;
+  deletion_requested?: boolean;
+  deletion_reason?: string | null;
+  deletion_requested_at?: string | null;
+  deletion_requested_by?: string | null;
 }
 
 interface DailySummary {
@@ -476,6 +480,63 @@ const Reports = () => {
     }
   };
 
+  // Handler for approving deletion request (actually delete the record)
+  const handleApproveDeletion = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('weighing_records')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Registro excluído',
+        description: 'O registro foi excluído permanentemente.',
+      });
+      
+      fetchRecords();
+    } catch (error) {
+      console.error('Error deleting record:', error);
+      toast({
+        title: 'Erro ao excluir',
+        description: 'Não foi possível excluir o registro.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Handler for rejecting deletion request (cancel the request)
+  const handleRejectDeletion = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('weighing_records')
+        .update({
+          deletion_requested: false,
+          deletion_reason: null,
+          deletion_requested_at: null,
+          deletion_requested_by: null,
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Solicitação rejeitada',
+        description: 'A solicitação de exclusão foi cancelada.',
+      });
+      
+      fetchRecords();
+    } catch (error) {
+      console.error('Error rejecting deletion:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível rejeitar a solicitação.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (loading || (isAuthenticated && !profile)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -526,8 +587,9 @@ const Reports = () => {
   }
 
   const offlineRecords = records.filter(r => r.created_offline);
-  const pendingApprovalRecords = offlineRecords.filter(r => !r.approved_at && !r.rejected_at);
+  const pendingApprovalRecords = offlineRecords.filter(r => !r.approved_at && !r.rejected_at && !r.deletion_requested);
   const rejectedRecords = offlineRecords.filter(r => r.rejected_at);
+  const pendingDeletionRecords = records.filter(r => r.deletion_requested);
 
   return (
     <div className="min-h-screen bg-background">
@@ -559,14 +621,18 @@ const Reports = () => {
 
         {/* Tabs */}
         <Tabs defaultValue={defaultTab} className="mt-8">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4">
+          <TabsList className="grid w-full max-w-3xl grid-cols-5">
             <TabsTrigger value="pending" className="gap-2">
               <Clock className="w-4 h-4" />
               <span className="hidden sm:inline">Pendentes</span> ({pendingApprovalRecords.length})
             </TabsTrigger>
             <TabsTrigger value="sync-errors" className="gap-2">
               <AlertCircle className="w-4 h-4" />
-              <span className="hidden sm:inline">Erros Sync</span> ({syncErrorRecords.length})
+              <span className="hidden sm:inline">Erros</span> ({syncErrorRecords.length})
+            </TabsTrigger>
+            <TabsTrigger value="deletions" className="gap-2">
+              <Trash2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Exclusões</span> ({pendingDeletionRecords.length})
             </TabsTrigger>
             <TabsTrigger value="rejected" className="gap-2">
               <XCircle className="w-4 h-4" />
@@ -598,6 +664,85 @@ const Reports = () => {
               onRequestDeletion={handleRequestDeletion}
               isLoading={false}
             />
+          </TabsContent>
+
+          <TabsContent value="deletions" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Trash2 className="w-5 h-5 text-destructive" />
+                  Solicitações de Exclusão Pendentes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
+                    ))}
+                  </div>
+                ) : pendingDeletionRecords.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Trash2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p className="font-medium">Nenhuma solicitação de exclusão</p>
+                    <p className="text-sm mt-1">Não há registros aguardando aprovação de exclusão.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingDeletionRecords.map(record => (
+                      <div
+                        key={record.id}
+                        className="p-4 rounded-lg border border-destructive/30 bg-destructive/5"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-semibold">{record.vehicle_plate}</span>
+                              <Badge variant="destructive" className="text-xs">
+                                Exclusão Solicitada
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-muted-foreground space-y-0.5">
+                              {record.driver_name && <p>Motorista: {record.driver_name}</p>}
+                              {record.product && <p>Produto: {record.product}</p>}
+                              <p>
+                                {format(new Date(record.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                              </p>
+                              {record.deletion_reason && (
+                                <p className="mt-2 text-destructive">
+                                  <span className="font-medium">Motivo:</span> {record.deletion_reason}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            <div className="text-lg font-bold text-primary">
+                              {Number(record.net_weight).toLocaleString('pt-BR')} kg
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleApproveDeletion(record.id)}
+                              >
+                                Excluir
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleRejectDeletion(record.id)}
+                              >
+                                Manter
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="rejected" className="mt-6">
