@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { Wifi, WifiOff, RefreshCw, AlertTriangle, ToggleLeft, ToggleRight } from 'lucide-react';
 import { ConnectionStatus } from '@/types/weighing';
 import { cn } from '@/lib/utils';
@@ -56,6 +57,7 @@ export function StatusBanner({
   isSimulatedOffline,
   onToggleSimulatedOffline,
 }: StatusBannerProps) {
+  const navigate = useNavigate();
   const config = statusConfig[status];
   const Icon = config.icon;
 
@@ -110,7 +112,11 @@ export function StatusBanner({
           )}
 
           {pendingCount > 0 && (
-            <div className="flex items-center gap-2 text-sm">
+            <button
+              onClick={() => navigate('/reports?tab=pendentes')}
+              className="flex items-center gap-2 text-sm hover:opacity-80 transition-opacity cursor-pointer"
+              title="Ver registros pendentes"
+            >
               <span className="text-muted-foreground hidden sm:inline">Pendentes:</span>
               <span className={cn(
                 'px-2 py-0.5 rounded-full font-mono font-semibold',
@@ -118,7 +124,7 @@ export function StatusBanner({
               )}>
                 {pendingCount}
               </span>
-            </div>
+            </button>
           )}
 
           {lastSyncTime && (
