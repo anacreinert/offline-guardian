@@ -84,6 +84,7 @@ const Reports = () => {
     records: localRecords, 
     getPendingRecords,
     updateRecordSyncStatus,
+    deleteLocalRecord,
   } = useWeighingRecords();
 
   // Get tab from URL params
@@ -104,8 +105,6 @@ const Reports = () => {
     photo_urls: r.photoUrls || null,
     sync_error: r.syncError,
     sync_attempts: r.syncAttempts,
-    deletion_requested: false,
-    deletion_reason: undefined,
   }));
 
   // Only gestor/admin roles can access this page
@@ -445,39 +444,13 @@ const Reports = () => {
     }
   };
 
-  // Handler for requesting deletion
-  const handleRequestDeletion = async (id: string, reason: string) => {
-    try {
-      // Update in database if it exists
-      const { error } = await supabase
-        .from('weighing_records')
-        .update({
-          deletion_requested: true,
-          deletion_reason: reason,
-          deletion_requested_at: new Date().toISOString(),
-          deletion_requested_by: profile?.user_id,
-        })
-        .eq('id', id);
-
-      if (error) {
-        // Record might not be in database yet (local only)
-        console.log('Record not in database, marking locally');
-      }
-
-      toast({
-        title: 'Exclusão solicitada',
-        description: 'A solicitação de exclusão foi enviada para aprovação.',
-      });
-      
-      fetchRecords();
-    } catch (error) {
-      console.error('Error requesting deletion:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível solicitar a exclusão.',
-        variant: 'destructive',
-      });
-    }
+  // Handler for deleting local record
+  const handleDeleteLocal = (id: string) => {
+    deleteLocalRecord(id);
+    toast({
+      title: 'Registro excluído',
+      description: 'O registro local foi removido.',
+    });
   };
 
   // Handler for approving deletion request (actually delete the record)
@@ -661,7 +634,7 @@ const Reports = () => {
             <SyncErrorManager
               records={syncErrorRecords}
               onRetrySync={handleRetrySync}
-              onRequestDeletion={handleRequestDeletion}
+              onDelete={handleDeleteLocal}
               isLoading={false}
             />
           </TabsContent>
