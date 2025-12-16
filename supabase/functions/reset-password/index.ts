@@ -15,6 +15,47 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+    // CRITICAL: Verify caller is authenticated and is admin
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('No authorization header provided');
+      return new Response(
+        JSON.stringify({ error: 'Não autorizado' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get caller's user from JWT
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user: callerUser }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !callerUser) {
+      console.error('Invalid token or user not found:', userError);
+      return new Response(
+        JSON.stringify({ error: 'Token inválido' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if caller is admin
+    const { data: roleData, error: roleError } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', callerUser.id)
+      .single();
+
+    if (roleError || roleData?.role !== 'admin') {
+      console.error('Access denied - user is not admin:', callerUser.id, roleData?.role);
+      return new Response(
+        JSON.stringify({ error: 'Acesso negado. Apenas administradores podem resetar senhas.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Admin ${callerUser.id} requesting password reset`);
+
     const { userId, email, newPassword } = await req.json();
 
     if ((!userId && !email) || !newPassword) {
@@ -24,7 +65,6 @@ serve(async (req) => {
       );
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     let targetUserId = userId;
 
