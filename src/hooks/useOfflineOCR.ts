@@ -500,31 +500,58 @@ function applyPositionalCorrections(text: string): string {
   return result;
 }
 
-// Try to generate plate variants for when OCR result is clearly wrong (like EEE3E33)
+// Try to generate plate variants for when OCR result is clearly wrong
+// EXPANDED: T->R, M->I/N/W, X->A/K, H->I/R, etc. for FE-Font misreads
 function generatePlateVariants(text: string): string[] {
   const cleaned = text.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   if (cleaned.length !== 7) return [cleaned];
 
-  // Common FE-Font misreads with priority order (most likely first)
+  // COMPREHENSIVE BIDIRECTIONAL FE-Font misreads
+  // Key insight: If Tesseract misreads R as O, then from O we should try R
   const feReplacements: Record<string, string[]> = {
-    'E': ['R', 'I', 'O', 'B', 'A'],  // Prioritize most common
-    '3': ['2', '1', '8', 'A', 'E'],  // 3 often misread from these
-    'F': ['R', 'P'],
-    '8': ['B', '0'],
-    'B': ['R', '8'],
-    'P': ['R', 'B'],
-    '0': ['O', 'D'],
-    '1': ['I', 'L'],
-    '6': ['G'],
-    '5': ['S'],
-    '2': ['Z'],
-    '4': ['A'],
-    '7': ['1', 'T'],
-    '9': ['G', 'Q'],
+    // Letters - BIDIRECTIONAL mappings
+    'A': ['4', 'R', 'H', 'X'],
+    'B': ['R', '8', 'D', 'P', '3', 'E'],
+    'C': ['G', 'O', '0', '('],
+    'D': ['O', '0', 'B', 'P'],
+    'E': ['R', 'I', 'O', 'B', 'A', 'F', 'P', '3'],
+    'F': ['R', 'P', 'E', 'T', '7'],
+    'G': ['6', 'C', 'O', '9', 'Q'],
+    'H': ['I', 'R', 'N', 'M', 'A', '4'],
+    'I': ['1', 'L', 'T', 'J', '!', '|'],
+    'J': ['1', 'I', 'U'],
+    'K': ['X', 'K', 'H'],
+    'L': ['1', 'I', 'J'],
+    'M': ['I', 'N', 'W', 'H', 'R', 'O'],  // M can be misread from many letters
+    'N': ['M', 'H', 'W'],
+    'O': ['0', 'D', 'Q', 'C', 'R', 'G'],  // O→R added
+    'P': ['R', 'B', 'D', 'F', '9'],
+    'Q': ['O', '0', 'G', '9'],
+    'R': ['B', 'P', 'A', 'O'],            // R→O bidirectional
+    'S': ['5', '8', '$'],
+    'T': ['R', 'I', 'Y', '7', '1', 'F'],  // T→I,R critical
+    'U': ['V', 'W', 'J'],
+    'V': ['U', 'W', 'Y'],
+    'W': ['M', 'V', 'N'],
+    'X': ['A', 'K', 'Y', '4', 'H'],       // X→A critical
+    'Y': ['V', '4', 'T'],
+    'Z': ['2', '7'],
+    
+    // Numbers - BIDIRECTIONAL mappings
+    '0': ['O', 'D', 'Q', 'C'],
+    '1': ['I', 'L', 'T', '7', '!', '|'],
+    '2': ['Z', '7', '1', '8'],            // 2→1,8 added!
+    '3': ['E', '8', 'B'],
+    '4': ['A', 'H', 'Y'],
+    '5': ['S', '6'],
+    '6': ['G', '5', 'B'],
+    '7': ['1', 'T', 'Z', '2'],
+    '8': ['B', '0', '3', 'S', '2'],       // 8→2 bidirectional
+    '9': ['G', 'Q', 'P', '6'],
   };
 
   const validVariants: string[] = [];
-  const MAX_VARIANTS = 50;
+  const MAX_VARIANTS = 100; // Increased for more coverage
   
   // Generate variants using iterative approach with early pruning
   function tryGenerate(pos: number, current: string): void {
